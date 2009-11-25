@@ -1,0 +1,637 @@
+""===[[ START HDOC ]]==========================================================#
+""===[[ HEADER ]]==============================================================#
+
+"   niche         : integrated development environment
+"   application   : rsh_tag.vim
+"   purpose       : smooth ctags navigation within vim/ide
+"   base_system   : gnu/linux
+"   lang_name     : vim script
+"   created       : svq - long, long ago
+"   author        : the_heatherlys
+"   dependencies  : none (vim only)
+"   permissions   : GPL-2 with no warranty of any kind
+"
+"
+""===[[ PURPOSE ]]=============================================================#
+
+"   rsh_tag is a fast, clear, standard, and simple tag navigation tool to
+"   provide the programmer with a categorized table of global symbols for all
+"   buffers open in the current vim session
+"
+"   this tool is meant to provide...
+"      - an inventory of all global symbols in the file
+"      - to work with all major programming and scripting languages
+"      - quick, short-cut based navigation within a file/window
+"      - and nothing else
+"
+"
+""===[[ END HDOC ]]============================================================#
+
+
+
+""===[[ HEADER GUARD ]]========================================================#
+if exists('RSH_TAG_hguard')
+   finish
+endif
+let g:RSH_TAG_hguard = 1
+
+
+
+""===[[ GLOBALS ]]=============================================================#
+let g:RSH_TAG_title    = "rsh_tag_ctags"
+let g:RSH_TAG_ctags    = "exuberant-ctags"
+let g:RSH_TAG_locked   = "n"
+let g:RSH_TAG_times    = 0
+let g:RSH_TAG_mode     = 't'  " t=tags, f=function, c=cflow, b=breaks
+
+
+
+""===[[ AUTO COMMANDS ]]=======================================================#
+
+nmap        ,t       :hTAG_show()<cr>
+map         ;;       :hTAG_hints()<cr>
+
+
+""===[[ SETUP ]]===============================================================#
+
+
+function! RSH_TAG_init()
+   silent! exec 'vert split '.g:RSH_TAG_title
+   setlocal modifiable
+   call RSH_ALL_start()
+   call RSH_TAG_syntax()
+   call RSH_TAG_keys()
+   setlocal nomodifiable
+   hide
+   return
+endfunction
+
+
+function! RSH_TAG_syntax()
+   syntax clear
+   syntax match rsh_tag_file               '^[A-Za-z0-9_.-]\+[ ]\+FILE'
+   syntax match rsh_tag_major              '^[a-z].*[ ]([0-9]\+)$'
+   syntax match rsh_tag_null               '^[a-z].*[ ]([-])$'
+   syntax match rsh_tag_context            '^  [a-z][a-z/][a-z] [=].*'
+   syntax match rsh_tag_detail             '^[a-z][a-z]  .*'
+   syntax match rsh_tag_tag                '^[a-z][a-z]  ' containedin=rsh_tag_detail
+   syntax match rsh_tag_flow               '^[ ]*[A-Za-z0-9_]*() $'
+   syntax match rsh_tag_flowstd            '^[ ]*[A-Za-z0-9_]*()$'
+   hi rsh_tag_file     cterm=reverse,bold   ctermbg=none   ctermfg=5
+   hi rsh_tag_major    cterm=bold,underline ctermbg=none   ctermfg=5
+   hi rsh_tag_null     cterm=none           ctermbg=none   ctermfg=7
+   hi rsh_tag_context  cterm=none           ctermbg=none   ctermfg=3
+   hi rsh_tag_detail   cterm=none           ctermbg=none   ctermfg=0
+   hi rsh_tag_tag      cterm=bold           ctermbg=none   ctermfg=4
+   hi rsh_tag_flow     cterm=bold           ctermbg=none   ctermfg=3
+   hi rsh_tag_flowstd  cterm=bold           ctermbg=none   ctermfg=2
+   return
+endfunction
+
+
+function! RSH_TAG_keys()
+   nmap <buffer> u   :call RSH_TAG_update()<cr>
+   nmap <buffer> t   :call RSH_TAG_show_tags()<cr>
+   nmap <buffer> f   :call RSH_TAG_show_func()<cr>
+   nmap <buffer> c   :call RSH_TAG_show_cflow()<cr>
+   nmap <buffer> b   :call RSH_TAG_show_break()<cr>
+   nmap <buffer> h   :call RSH_TAG_hide()<cr>
+   return
+endfunction
+
+
+
+"===[[ START/STOP ]]===========================================================#
+
+
+function! RSH_TAG_change()
+   "---(do not allow recursion)------------------#
+   if (g:RSH_TAG_locked == "y")
+      return
+   endif
+   "---(save working win/buf/loc)----------------#
+   echon "hTAG_show()           :: "
+   let  l:rc  = RSH_BUF_save()
+   if l:rc < 1
+      return
+   endif
+   "---(check to see if tags even open)----------#
+   let l:tag_win = RSH_TAG_find(g:RSH_TAG_title)
+   if (l:tag_win < 1)
+      return
+   endif
+   "---(lock her down)---------------------------#
+   let  g:RSH_BUF_locked = "y"
+   let  g:RSH_TAG_locked = "y"
+   silent! exec l:tag_win.' wincmd w'
+   "---(go to the right place)-------------------"
+   normal gg
+   call search("^".g:RSH_BUF_progname."[ ].*FILE$","cW")
+   silent exec "normal zt"
+   "---(go back to working win/buf/loc)----------#
+   call RSH_BUF_restore()
+   "---(let her go)------------------------------#
+   let  g:RSH_TAG_locked = "n"
+   let  g:RSH_BUF_locked = "n"
+   "---(complete)--------------------------------#
+   return
+endfunction
+
+"" save existing location, bring up rsh_tags, make it active, and exit
+function! hTAG_show()
+   "---(do not allow recursion)------------------#
+   if (g:RSH_TAG_locked == "y")
+      return
+   endif
+   "---(save working win/buf/loc)----------------#
+   echon "RSH_TAG_change()         :: "
+   let l:rc = RSH_BUF_save()
+   if l:rc < 1
+      return
+   endif
+   "---(lock her down)---------------------------#
+   let  g:RSH_BUF_locked = "y"
+   let  g:RSH_TAG_locked = "y"
+   silent! exec l:tag_win.' wincmd w'
+   "---(check for the buffer)--------------------#
+   let l:tag_buf         = bufnr(g:RSH_TAG_title)
+   if (l:tag_buf < 1)
+      call RSH_TAG_init()
+   endif
+   "---(close the existing window)---------------#
+   let l:tag_win = bufwinnr(l:tag_buf)
+   if (l:tag_win > 0)
+      silent exec l:tag_win.' wincmd w'
+      hide
+   endif
+   "---(position it properly)--------------------#
+   silent! exec 'vert split '.g:RSH_TAG_title
+   vert resize 20
+   "---(activate the repositioning)--------------#
+   augroup rsh_tag
+      autocmd rsh_tag   BufEnter      * call RSH_TAG_change()
+      autocmd rsh_tag   BufRead       * call RSH_TAG_change()
+      autocmd rsh_tag   BufNewFile    * call RSH_TAG_change()
+   augroup END
+   ""===[[ complete ]]=====================================#
+   normal zt
+   "---(let her go)------------------------------#
+   let  g:RSH_BUF_locked = "n"
+   let  g:RSH_TAG_locked = "n"
+   "---(complete)--------------------------------#
+   echon "hTAG_show()           :: complete."
+   return
+endfunction
+
+
+function! RSH_TAG_hide()
+   "---(check for the buffer)--------------------#
+   let l:buf_num = bufnr(g:RSH_TAG_title)
+   if (l:buf_num < 1)
+      return
+   endif
+   "---(check for the window)--------------------#
+   let l:win_num = bufwinnr(l:buf_num)
+   if (l:win_num < 1)
+      return
+   endif
+   "---(open the buffer window)------------------#
+   autocmd! rsh_tag
+   augroup! rsh_tag
+   augroup END
+   silent exec l:win_num.' wincmd w'
+   hide
+   "---(complete)--------------------------------#
+   return
+endfunction
+
+
+
+function! RSH_TAG_show_func()
+   let g:RSH_TAG_mode = 'f'
+   let l:win_cur = bufwinnr(g:RSH_BUF_progbuf)
+   if (l:win_cur != -1)
+      exec l:win_cur.' wincmd w'
+   endif
+   return
+endfunction
+
+function! RSH_TAG_show_cflow()
+   let g:RSH_TAG_mode = 'c'
+   let l:win_cur = bufwinnr(g:RSH_BUF_progbuf)
+   if (l:win_cur != -1)
+      exec l:win_cur.' wincmd w'
+   endif
+   return
+endfunction
+
+function! RSH_TAG_show_break()
+   let g:RSH_TAG_mode = 'b'
+   let l:win_cur = bufwinnr(g:RSH_BUF_progbuf)
+   if (l:win_cur != -1)
+      exec l:win_cur.' wincmd w'
+   endif
+   return
+endfunction
+
+function! RSH_TAG_show_tags()
+   let g:RSH_TAG_mode = 't'
+   let l:win_cur = bufwinnr(g:RSH_BUF_progbuf)
+   if (l:win_cur != -1)
+      exec l:win_cur.' wincmd w'
+   endif
+   return
+endfunction
+
+function! hTAG_hints()
+   "---(switch to tag window)-----------------#
+   let    l:buf_cur = bufnr('%')
+   let    g:RSH_BUF_progbuf = l:buf_cur
+   "---(defensive programming)----------------#
+   if (getbufvar(bufnr('%'), '&modifiable') != 1)
+      echo "hTAG_hints() :: can not use this as an editing window..."
+      return
+   endif
+   if (getbufvar(l:buf_cur, '&buflisted') == 0)
+      echo "hTAG_hints()     :: can not load tags from specialty window..."
+      return
+   endif
+   "---(get and vaidate the hint)-------------#
+   echo   "enter tag text : "
+   let    l:x_one = printf("%c", getchar())
+   echon  l:x_one
+   if l:x_one < "a" || l:x_one > "z"
+      echon "  (invalid character) user canceled..."
+      return
+   endif
+   let    l:x_two = printf("%c", getchar())
+   echon  l:x_two
+   if l:x_two < "a" || l:x_two > "z"
+      echon "  (invalid character) user canceled..."
+      return
+   endif
+   let    l:x_tag = l:x_one . l:x_two
+   "---(identify the handler)-----------------#
+   if l:x_one >= "m"
+      echon "  (cscope/grep tag) processing..."
+      call RSH_CSC_hints(l:x_tag)
+      return
+   endif
+   echon "  (normal ctag) processing..."
+   "---(switch to tag window)-----------------#
+   let    l:buf_cur = bufnr('%')
+   let    l:win_num = RSH_TAG_find(g:RSH_TAG_title)
+   if (l:win_num != -1)
+      silent exec l:win_num.' wincmd w'
+   endif
+   silent exec   ":normal gg"
+   "---(find the tag)-------------------------#
+   call   search("^" . l:x_tag . "  ","cW")
+   if line(".") <= 1
+      echon "  TAG NOT FOUND, exiting"
+      normal ,a
+      return
+   endif
+   let  l:full_line   = getline(".")
+   "---(parse the tag entry)------------------#
+   let  l:rtag_file    = matchstr(l:full_line, "  #2#  .*  #3#  ")
+   let  l:rtag_file    = strpart(l:rtag_file, 7, strlen(l:rtag_file) - 14)
+   let  l:rtag_line    = matchstr(l:full_line, "  #1#  .*  #2#  ")
+   let  l:rtag_line    = strpart(l:rtag_line, 7, strlen(l:rtag_line) - 14) - 1
+   let  l:rtag_iden    = matchstr(l:full_line, "  #3#  .*  #4#  ")
+   let  l:rtag_iden    = strpart(l:rtag_iden, 7, strlen(l:rtag_iden) - 14)
+   "---(highlight the tag)--------------------#
+   silent exec "silent! syntax clear rsh_tag_identifier"
+   silent exec "hi link rsh_tag_identifier function"
+   silent exec "syntax match rsh_tag_identifier ' " . l:rtag_iden . " ' containedin=ALL"
+   "---(get back to the original window)------#
+   let l:win_cur = bufwinnr(g:RSH_BUF_progbuf)
+   if (l:win_cur != -1)
+      silent exec l:win_cur.' wincmd w'
+   endif
+   "---(get to the right buffer)--------------#
+   if bufname('%') != l:rtag_file
+      let l:buf_num = bufnr(l:rtag_file)
+      if (l:buf_num == -1)
+         echo "hTAG_hints() :: buffer not open in wim..."
+         return
+      else
+         silent exec('b! ' . l:buf_num)
+      endif
+   endif
+   "---(get to the right line)----------------# make sure to show comments above
+   silent exec ":normal gg"
+   silent! exec ":normal " . l:rtag_line . "j"
+   silent exec "normal {jzt"
+   "---(do special highlighting)--------------#
+   "silent exec "highlight rsh_tag_match cterm=reverse"
+   "silent exec "match rsh_tag_match /".l:rtag_iden."/"
+   return
+endfunction
+
+
+
+""===[[ UTILITY ]]=============================================================#
+
+"find a window number for a named buffer
+function! RSH_TAG_find(buf_name)
+   let l:buf_num = bufnr(a:buf_name)
+   if (l:buf_num != -1)
+      let l:win_num = bufwinnr(l:buf_num)
+   else
+      let l:win_num = -1
+   endif
+   return l:win_num
+endfunction
+
+
+
+""===[[ WINDOW UPDATE CODE ]]==================================================#
+
+function! RSH_TAG_update()
+   "---(do not allow recursion)------------------#
+   if (g:RSH_TAG_locked == "y")
+      return
+   endif
+   "---(start locked code)-----------------------#
+   let  g:RSH_BUF_locked = "y"
+   let  g:RSH_TAG_locked = "y"
+   let  g:RSH_TAG_times  += 1
+   call RSH_TAG_list()
+   "---(unlock code)-----------------------------#
+   let  g:RSH_TAG_locked = "n"
+   let  g:RSH_BUF_locked = "n"
+   "---(return to previous window)---------------#
+   call RSH_BUF_restore()
+   "---(complete)--------------------------------#
+   echon "RSH_TAG_update()         :: complete."
+   return
+endfunction
+
+
+function! RSH_TAG_list()
+   ""---(prepare locals)-------------------------#
+   let l:max_buf_num = bufnr('$')     " Get the number of the last buffer.
+   let l:g_hint_major = 1
+   let l:g_hint_minor = 0
+   let l:first_file   = "y"
+   ""---(clear out existing contents)------------#
+   setlocal modifiable
+   silent exec ":1,$delete"
+   " Loop through every buffer less than the total number of buffers.
+   let l:i = 0                     " buffer index
+   while l:i < l:max_buf_num
+      "---(update the number)--------------------#
+      let l:i = l:i + 1
+      "---(do not deal with specialty)-----------#
+      if (getbufvar(l:i, '&buflisted') == 0)
+         continue
+      endif
+      if (getbufvar(l:i, '&modifiable') == 0)
+         continue
+      endif
+      "---(read the buffer)----------------#
+      let l:full_name = bufname(l:i)
+      let l:base_loc  = match(l:full_name,"[A-Za-z0-9_.]*$")
+      let l:base_name = strpart(l:full_name,l:base_loc)
+      echon "RSH_TAG_list()           :: processing ".l:base_name."..."
+      "---(mark the bottom tags)--------#
+      normal GG
+      silent! normal mx
+      "---(run the tags)----------------#
+      silent! exec "$:!ctags -x --sort=no --c-kinds=cdefgnpstuvx --c++-kinds=cdefgnpstuvx --file-scope=yes ".l:full_name
+      "---(go back and awk them)--------#
+      silent! normal 'x
+      silent! exec ":silent! .,$!rsh_tag.awk 'g_hint_major=".l:g_hint_major."' 'g_hint_minor=".l:g_hint_minor."' 'g_file_name=".l:base_name."'"
+      "---(collect the 'last tag')------#
+      normal GG
+      let l:g_hint_minor = getline('.')
+      normal dd
+      let l:g_hint_major = getline('.')
+      normal dd
+      "---(go back and awk them)--------#
+      silent! normal 'x
+      call RSH_TAG_func_syn(l:base_name)
+      "---(breakpoints)-----------------#
+      "call RSH_TAG_breakpoints(l:i)
+      "---(create some space)-----------#
+      "endif
+      normal 80o
+   endwhile
+   normal gg
+   setlocal nomodifiable
+   return
+endfunction
+
+
+function! RSH_TAG_func_syn(base_name)
+   "> start of next buffer entriies
+   normal j
+   let l:stop_line  = search("   FILE$", "W") - 1
+   if l:stop_line == -1
+      normal GG
+      let  l:stop_line    = line('.')
+   endif
+   "---(find the functions)----------------------#
+   silent! normal 'x
+   let  l:curr_line = search("function (","W", l:stop_line)
+   silent! exec "normal mx"
+   if l:curr_line == 0
+      return
+   endif
+   let  l:full_line    = getline('.')
+   let  l:count        = matchstr(l:full_line, "(.*)")
+   let  l:count        = strpart(l:count, 1, strlen(l:count) - 2 ) - 0
+   let  l:curr         = 1
+   let  l:rtag_iden    = " "
+   let  l:rtag_list    = []
+   while l:curr <= l:count
+      silent! exec "normal 'x"
+      exec "normal ".l:curr."j"
+      let  l:full_line    = getline('.')
+      if l:full_line == ""
+         break
+      endif
+      "echo "RSH_TAG_findloc()        :: parse (".l:curr.") ".l:full_line
+      "sleep 1
+      let  l:rtag_iden    = matchstr(l:full_line, "  #3#  .*  #4#  ")
+      let  l:rtag_iden    = strpart(l:rtag_iden, 7, strlen(l:rtag_iden) - 14)
+      "echo "RSH_TAG_findloc()        :: parse (".l:curr.") ".l:rtag_iden
+      "sleep 1
+      let  l:rtag_list += [l:rtag_iden]
+      let  l:curr = l:curr + 1
+   endwhile
+   "---(complete)--------------------------------#
+   "echo "RSH_TAG_findloc()        :: returning ".l:rtag_iden."..."
+   "sleep 1
+   let l:my_buf = bufnr('%')
+   silent exec('b! ' . bufnr(a:base_name))
+   "echo "RSH_TAG_findloc()        :: moved from ".l:my_buf." to ".bufnr('%')
+   "sleep 1
+   execute 'silent! syntax clear rsh_tag_function'
+   for  l:temp in l:rtag_list
+      silent exec "syntax match rsh_tag_function '".l:temp."'"
+      "echo "RSH_TAG_findloc()        :: parsing ".l:temp."..."
+      "sleep 1
+   endfor
+   "hi rsh_tag_function     cterm=bold ctermbg=none   ctermfg=5
+   hi rsh_tag_function     cterm=bold ctermbg=6      ctermfg=4
+   silent exec('b! '.l:my_buf)
+   return
+endfunction
+
+function! RSH_TAG_findloc(base_name, line_num)
+   let l:curr_buf    = bufnr('%')     " get the current_buf
+   "echo "RSH_TAG_findloc()        :: search for ".a:base_name." at ".a:line_num
+   "sleep 1
+   "---(check for the buffer)--------------------#
+   let l:buf_num = bufnr(g:RSH_TAG_title)
+   if (l:buf_num < 1)
+      return
+   endif
+   silent exec('b! ' . l:buf_num)
+   "---(get full tag range for buffer)-----------#
+   "> start of buffer entries
+   normal gg
+   let  l:start_line = search("^".a:base_name."  ","cW")
+   silent! exec "normal mx"
+   "> start of next buffer entriies
+   normal j
+   let l:stop_line  = search("   FILE$", "W") - 1
+   if l:stop_line == -1
+      normal GG
+      let  l:stop_line    = line('.')
+   endif
+   "echo "RSH_TAG_findloc()        :: search between ".l:start_line." and ".l:stop_line
+   "sleep 1
+   "---(find the functions)----------------------#
+   silent! exec "normal 'x"
+   let  l:curr_line = search("function (","W", l:stop_line)
+   silent! exec "normal mx"
+   if l:curr_line == 0
+      "echon "RSH_TAG_findloc()        :: no functions in file ".a:base_name."..."
+      return "[--] <<global>>"
+   endif
+   let  l:full_line    = getline('.')
+   let  l:count        = matchstr(l:full_line, "(.*)")
+   let  l:count        = strpart(l:count, 1, strlen(l:count) - 2 ) - 0
+   "echo "RSH_TAG_findloc()        :: functions ".l:curr_line." with ".l:count
+   "sleep 1
+   let  l:curr         = 1
+   let  l:rtag_iden    = " "
+   let  l:rtag_final   = "[--] <<global>>"
+   while l:curr <= l:count
+      silent! exec "normal 'x"
+      exec "normal ".l:curr."j"
+      let  l:full_line    = getline('.')
+      if l:full_line == ""
+         break
+      endif
+      "echo "RSH_TAG_findloc()        :: parse (".l:curr.") ".l:full_line
+      "sleep 1
+      let  l:rtag_line    = matchstr(l:full_line, "  #1#  .*  #2#  ")
+      let  l:rtag_line    = strpart(l:rtag_line, 7, strlen(l:rtag_line) - 14) - 1
+      if l:rtag_line >= a:line_num
+         "echo "RSH_TAG_findloc()        :: found..."
+         "sleep 1
+         break
+      endif
+      let  l:rtag_iden    = matchstr(l:full_line, "  #3#  .*  #4#  ")
+      let  l:rtag_iden    = strpart(l:rtag_iden, 7, strlen(l:rtag_iden) - 14)
+      let  l:rtag_final   = "[".strpart(l:full_line, 0, 2)."] ".l:rtag_iden
+      "echo "RSH_TAG_findloc()        :: parse (".l:curr.") ".l:rtag_iden
+      "sleep 1
+      let  l:curr = l:curr + 1
+   endwhile
+   "---(complete)--------------------------------#
+   "echo "RSH_TAG_findloc()        :: returning ".l:rtag_iden."..."
+   "sleep 1
+   silent exec('b! ' . l:curr_buf)
+   return l:rtag_final
+endfunction
+
+"------------------------------------------------------------------------------#
+
+function! RSH_TAG_breakpoints(prog_buf)
+   let l:my_buf      = bufnr('%')     " get the tag buffer number
+   let l:num_break   = 1
+   "normal GG
+   "silent! exec "normal obreakpoints (0)"
+   silent! exec "normal 'x"
+   "---(find the function tags)---------#
+   let  l:curr_line = search("function (",'cW')
+   normal j
+   let  l:full_line    = getline('.')
+   let  l:curr_line    = line('.')
+   while l:full_line != ""
+      let  l:rtag_line    = matchstr(l:full_line, "  #2#  .*  #3#  ")
+      let  l:rtag_line    = strpart(l:rtag_line, 7, strlen(l:rtag_line) - 14) - 0
+      let  l:rtag_iden    = matchstr(l:full_line, "  #3#  .*  #4#  ")
+      let  l:rtag_iden    = strpart(l:rtag_iden, 7, strlen(l:rtag_iden) - 14)
+      "echo "RSH_TAG_breakpoints()    :: finding ".l:rtag_iden."..."
+      silent exec('b! ' . a:prog_buf)
+      silent! exec "normal ".l:rtag_line-1."j"
+      silent! exec "normal {"
+      let  l:fout         = line('.')
+      normal j
+      let  l:fdef         = line('.')
+      call search("{", "cW")
+      let  l:fbeg         = line('.')
+      normal %
+      let  l:fend         = line('.')
+      silent exec('b! ' . l:my_buf)
+      normal GG
+      "echo "RSH_TAG_breakpoints()    :: writing ".l:rtag_iden."..."
+      silent! exec "normal o".l:fout."  out"
+      silent! exec "normal o".l:fdef."  def  ".l:rtag_iden
+      silent! exec "normal o".l:fbeg."  beg  ".l:rtag_iden
+      silent! exec "normal o".l:fend."  end  ".l:rtag_iden
+      "silent! exec "normal o".printf("%05d  out", l:fout)
+      "silent! exec "normal o".printf("%05d  def  %s", l:fdef, l:rtag_iden)
+      "silent! exec "normal o".printf("%05d  beg  %s", l:fbeg, l:rtag_iden)
+      "silent! exec "normal o".printf("%05d  end  %s", l:fend, l:rtag_iden)
+      "echo "RSH_TAG_breakpoints()    :: prepare for next..."
+      let l:num_break += 4
+      silent! exec "normal ".l:curr_line."G"
+      normal j
+      let  l:full_line    = getline('.')
+      let  l:curr_line    = line('.')
+   endwhile
+   normal GG
+   silent! exec "normal o99999  out"
+   silent! exec "normal 'x"
+   let  l:curr_line = search("breakpoints (",'cW')
+   silent! exec "normal ".l:curr_line."G"
+   silent! exec "normal A\b\b".l:num_break.")"
+   normal GG
+   return
+endfunction
+
+
+function! RSH_TAG_flow(prog_buf)
+   let l:full_name = bufname(a:prog_buf)
+   let l:my_buf      = bufnr('%')     " get the tag buffer number
+   let l:num_break   = 1
+   "---(can only work on c)----------------------#
+   let l:buf_type = getbufvar(l:full_name, "&filetype")
+   if l:buf_type != "c" && l:buf_type != "cpp"
+      echon "RSH_FIX_show()      :: will only work on C sources..."
+      return
+   endif
+   "---(basic cflow)-----------------------------"
+   normal "GG"
+   silent! exec "normal my"
+   silent! exec "normal o\nprogram flow (0)\n"
+   silent! exec ":$!cflow ".l:full_name." | cut -d'<' -f 1"
+   "---(clean up indentation)--------------------"
+   silent! exec "normal 'y"
+   silent! exec ":.,$s/    /   /g"
+   silent! exec "/arstionart"
+   "---(complete)--------------------------------"
+   normal "GG"
+   return
+endfunction
+
+
+call RSH_TAG_init()
+""===[[ END ]]=================================================================#

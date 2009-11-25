@@ -1,0 +1,465 @@
+""===[[ START HDOC ]]==========================================================#
+""===[[ HEADER ]]==============================================================#
+
+"   niche         : vim-ide (integrated development environment)
+"   application   : rsh_csc.vim
+"   purpose       : provide cscope x-ref and search access inside vim
+"   base_system   : gnu/linux
+"   lang_name     : vim script
+"   created       : svq - long, long ago
+"   author        : the_heatherlys
+"   dependencies  : none (vim only)
+"   permissions   : GPL-2 with no warranty of any kind
+"
+"
+""===[[ PURPOSE ]]=============================================================#
+
+"   rsh_csc is a fast, clear, standard, and integrated x-ref tool based on
+"   cscope/grep to allow a programmer to rapidly understand and move through
+"   a group of source files, confidently make changes, and support automated
+"   refactoring
+"
+"   cscope is an enduring, powerful, and insightful tool, but its traditional
+"   us is as a stand-alone tool that calls, but does not integrate, with an
+"   editor.  what this plugin will do is tie cscope back into vim and then
+"   make its capabilities available to automated refacortoring in order to
+"   drive down the cost and danger of making changes
+"
+"
+""===[[ TODOS ]]===============================================================#
+
+"
+""===[[ END HDOC ]]============================================================#
+
+
+
+""===[[ HEADER GUARD ]]========================================================#
+if exists('RSH_CSC_hguard')
+   finish
+endif
+let g:RSH_CSC_hguard = 10
+
+
+""===[[ GLOBALS ]]=============================================================#
+let g:RSH_CSC_title    = "rsh_csc_cscope"
+let g:RSH_CSC_times    = 0
+let g:RSH_CSC_locked   = "n"
+let g:RSH_CSC_curbuf   = -1
+let g:RSH_CSC_line     = 0
+let g:RSH_CSC_lines    = 0
+let g:RSH_CSC_current  = ""
+let g:RSH_CSC_sources  = "UNSET"
+let g:RSH_CSC_symbol   = ""
+let g:RSH_CSC_size     = 10
+
+
+nmap        ;a       :call RSH_CSC_query(expand("<cword>"))<cr>
+nmap        ;h       :call RSH_CSC_hide()<cr>
+nmap        ;r       :call RSH_CSC_replace()<cr>
+nmap        ;1       :call RSH_CSC_resize(10)<cr>
+nmap        ;2       :call RSH_CSC_resize(20)<cr>
+nmap        ;3       :call RSH_CSC_resize(30)<cr>
+
+
+""===[[ SERVICE ]]=============================================================#
+function! RSH_CSC(action)
+   " basic service functions :: start, stop, show, hide, clear, save
+   if     a:action == "start"
+      call RSH_CSC_start()
+   elseif a:action == "stop"
+      call RSH_CSC_stop()
+   elseif a:action == "show"
+      call RSH_CSC_show()
+   elseif a:action == "hide"
+      call RSH_CSC_hide()
+   elseif a:action == "clear"
+      call RSH_CSC_clear()
+   elseif a:action == "save"
+      echon "RSH_CSC (cscope)    :: service feature SAVE not implemented yet..."
+   else
+      echon "RSH_CSC (cscope)    :: service feature ".a:action." not understood..."
+   endif
+   "---(complete)--------------------------------#
+   return
+endfunction
+
+
+""===[[ SERVICE FEATURES ]]====================================================#
+
+"" PURPOSE > create and prepare the rsh_csc_cscope control window
+function! RSH_CSC_start()
+   "---(create the buffer/window)----------------#
+   silent! exec 'botright split ' . g:RSH_CSC_title
+   "---(prepare to update)-----------------------#
+   setlocal modifiable
+   "---(structural addributes)-------------------#
+   setlocal noswapfile
+   setlocal buftype=nofile
+   setlocal filetype=nofile
+   setlocal nobuflisted
+   setlocal bufhidden=hide
+   "---(cosmetic attributes)---------------------#
+   setlocal winfixheight
+   setlocal nowrap
+   setlocal textwidth=1000
+   setlocal foldcolumn=0
+   setlocal nonumber
+   setlocal nocursorcolumn
+   setlocal nocursorline
+   "---(syntax highlighting = lines)-------------#
+   syntax clear
+   syntax match rsh_csc_mtag     '^[a-z][a-z]  '        containedin=rsh_csc_entry
+   syntax match rsh_csc_ftag     ' \[[a-z-][a-z-]\] '   containedin=rsh_csc_entry
+   syntax match rsh_csc_num      ' : [0-9 ][0-9 ][0-9 ][0-9] : ' containedin=rsh_csc_entry
+   syntax match rsh_csc_entry    '^[a-z][a-z]  .*$'
+            \ containedin=rsh_fix_eone, rsh_fix_wone
+   hi rsh_csc_entry    cterm=bold   ctermbg=none  ctermfg=3
+   hi rsh_csc_mtag     cterm=bold   ctermbg=none  ctermfg=4
+   hi rsh_csc_ftag     cterm=bold   ctermbg=none  ctermfg=4
+   hi rsh_csc_num      cterm=bold   ctermbg=none  ctermfg=5
+   syntax match rsh_csc_count    ' [0-9][0-9]* '        containedin=rsh_csc_sum
+   syntax match rsh_csc_sum      '^cscope/grep .*$'
+   hi rsh_csc_sum      cterm=none   ctermbg=2     ctermfg=none
+   hi rsh_csc_count    cterm=none   ctermbg=3     ctermfg=none
+   "---(syntax highlighting = numbers)-----------#
+   "syntax match rsh_csc_ftag     '^..................[a-z][a-z]\] '  containedin=rsh_csc_entry
+   "hi rsh_csc_ftag  cterm=bold   ctermbg=none  ctermfg=4
+   "---(add the scope database)------------------#
+   "cs add cscope.out
+   "---(clever mappings)-------------------------#
+   "nmap <buffer> a   :call RSH_FIX_compile("a")<cr>
+   "nmap <buffer> c   :call RSH_FIX_compile("c")<cr>
+   "nmap <buffer> p   :call RSH_FIX_compile("p")<cr>
+   "nmap <buffer> m   :call RSH_FIX_compile("m")<cr>
+   "nmap <buffer> f   :call RSH_FIX_parse()<cr>
+   "nmap <buffer> j   j0
+   "nmap <buffer> k   k0
+   "nmap <buffer> h   :call RSH_FIX_hide()<cr>
+   "---(initial messsage)------------------------#
+   "normal 1,$d
+   "silent! exec "normal icscope interface window"
+   "call RSH_CSC_query("paint_root")
+   "---(prepare to return)-----------------------#
+   setlocal nomodifiable
+   hide
+   "---(complete)--------------------------------#
+   return
+endfunction
+
+
+
+""===[[ START/STOP ]]==========================================================#
+
+function! RSH_CSC_show()
+   ""===[[ prepare ]]======================================#
+   let l:buf_cur = bufnr('%')
+   ""===[[ defense ]]======================================#
+   if (getbufvar(l:buf_cur, '&modifiable') == 0)
+      echo "RSH_CSC_show()      :: can not load tags from specialty (unmodifiable) window..."
+      return
+   endif
+   if (getbufvar(l:buf_cur, '&buflisted') == 0)
+      echo "RSH_CSC_show()      :: can not load tags from specialty (unbuflisted) window..."
+      return
+   endif
+   "---(check for the buffer)--------------------#
+   let l:buf_num = bufnr(g:RSH_CSC_title)
+   if (l:buf_num < 1)
+      call RSH_CSC_init()
+   endif
+   "---(check for the window)--------------------#
+   let l:win_num = bufwinnr(l:buf_num)
+   if (l:win_num > 0)
+      silent exec l:win_num.' wincmd w'
+      hide
+   endif
+   "---(open the buffer window)------------------#
+   silent! exec 'botright split ' . g:RSH_CSC_title
+   let l:win_num = bufwinnr(l:buf_num)
+   silent! exec "resize ".g:RSH_CSC_size
+   "redraw!
+   return l:win_num
+endfunction
+
+function! RSH_CSC_resize(height)
+   let g:RSH_CSC_size  = a:height
+   call RSH_CSC_show()
+   normal ,a
+   return
+endfunction
+
+function! RSH_CSC_hide()
+   "---(check for the buffer)--------------------#
+   let l:buf_num = bufnr(g:RSH_CSC_title)
+   if (l:buf_num < 1)
+      return
+   endif
+   "---(check for the window)--------------------#
+   let l:win_num = bufwinnr(l:buf_num)
+   if (l:win_num < 1)
+      return
+   endif
+   "---(open the buffer window)------------------#
+   silent! exec l:win_num.' wincmd w'
+   silent! hide
+   echon "RSH_CSC_hide()      :: put away the cscope/grep window..."
+   "---(complete)--------------------------------#
+   normal ,a
+   return
+endfunction
+
+function! RSH_FIX_toggle()
+   "---(check for the buffer)--------------------#
+   let l:buf_num = bufnr(g:RSH_FIX_title)
+   if (l:buf_num < 1)
+      call RSH_FIX_show()
+      return
+   endif
+   "---(check for the window)--------------------#
+   let l:win_num = bufwinnr(l:buf_num)
+   if (l:win_num > 0)
+      call RSH_FIX_hide()
+   else
+      call RSH_FIX_show()
+   endif
+   "---(complete)--------------------------------#
+   return
+endfunction
+
+
+function! RSH_CSC_query(symbol)
+   "---(local variables)-------------------------#
+   let  l:hmajor    = 13                         " major letter of hint (awk)
+   let  l:hminor    = 0                          " minor letter of hint (awk)
+   let  l:replace   = "[zz] testing"             " default function ref
+   let  l:full_line = ""                         " current buffer line contents
+   let  l:line_eof  = 0                          " end of file line number
+   let  l:count     = 1                          " current iteration
+   let  g:RSH_CSC_symbol = a:symbol
+   "---(get the search buffer up)----------------#
+   normal ,a
+   let l:prog_buf    = bufnr('%')     " get the tag buffer number
+   call RSH_CSC_show()
+   let l:my_buf    = bufnr('%')     " get the current_buf
+   setlocal modifiable
+   let  g:RSH_BUF_locked = "y"
+   let  g:RSH_TAG_locked = "y"
+   "---(clean off old data)----------------------#
+   exec ":1,$delete"
+   "---(find with grep)--------------------------#
+   exec ":silent $!grep --line-number --no-messages --word-regexp \"".a:symbol."\" "."*.{c,h,cpp,hpp,vim,sh}"
+   "---(clean with awk)--------------------------#
+   silent! exec ":silent! .,$!rsh_csc.awk 'g_hmajor=".l:hmajor."' 'g_hminor=".l:hminor."' 'g_symbol=".a:symbol."'"
+   "---(set match syntax)------------------------#
+   execute 'silent! syntax clear rsh_csc_match'
+   execute 'highlight rsh_csc_match cterm=bold ctermbg=4 ctermfg=6'
+   execute 'syntax match rsh_csc_match "\<' . a:symbol . '\>" containedin=ALL'
+   "---(get the last line)-----------------------#
+   normal "GG"
+   let  l:line_eof     = line('.')
+   "---(get the function names)------------------#
+   while l:count < l:line_eof
+      "---(get the next entry)-------------------#
+      normal gg
+      exec "normal ".l:count."j"
+      normal 0
+      let  l:full_line    = getline('.')
+      "---(get the file name)--------------------#
+      normal 7l
+      normal E
+      let  l:word_end = col('.')
+      let  l:rcsc_file    = strpart(l:full_line, 6, l:word_end - 6)
+      "---(get the line number)------------------#
+      normal 0
+      normal 52lw
+      let  l:word_beg = col('.') - 1
+      normal e
+      let  l:word_end = col('.')
+      let  l:rcsc_line    = strpart(l:full_line, l:word_beg, l:word_end - l:word_beg) + 0
+      "---(call the tag search)------------------#
+      "echo "RSH_TAG_findloc()        :: (".l:count.") file ".l:rcsc_file." and ". l:rcsc_line."..."
+      "sleep 2
+      let  l:replace = RSH_TAG_findloc(l:rcsc_file, l:rcsc_line)
+      "echo "RSH_TAG_findloc()        :: is".l:replace."..."
+      "sleep 2
+      "---(return to the csc buffer)-------------#
+      silent exec('b! ' . l:my_buf)
+      "---(replace the tag reference)------------#
+      normal gg
+      exec "normal ".l:count."j"
+      normal 0
+      normal 25l
+      exec "normal R".l:replace
+      "---(replace the buffer reference)---------#
+      let l:its_buf = bufnr(l:rcsc_file)
+      if l:its_buf < 1
+         let l:its_buf = '-'
+      endif
+      if l:its_buf > 9
+         let l:its_buf = '+'
+      endif
+      normal 0
+      normal 4l
+      exec "normal R".l:its_buf
+      "---(get ready for the next loop)----------#
+      let l:count = l:count + 1
+   endwhile
+   "---(complete)--------------------------------#
+   setlocal nomodifiable
+   normal gg
+   normal ,a
+   silent! exec('b! ' . l:prog_buf)
+   let  g:RSH_TAG_locked = "n"
+   let  g:RSH_BUF_locked = "n"
+   return
+endfunction
+
+
+function! RSH_CSC_hints(tag)
+   "---(switch to tag window)-----------------#
+   let    l:buf_cur = bufnr('%')
+   let    l:win_num = RSH_TAG_find(g:RSH_CSC_title)
+   if (l:win_num < 1)
+      echon "  -- CSC not open, can not process..."
+   endif
+   silent exec l:win_num.' wincmd w'
+   normal gg
+   "---(find the tag)-------------------------#
+   call   search("^" . a:tag . "  ")
+   if line(".") < 2
+      echon "  -- tag not found, can not process..."
+      return
+   endif
+   normal 0
+   let  l:full_line    = getline('.')
+   "---(parse the tag entry)------------------#
+   normal 7l
+   normal E
+   let  l:word_end = col('.')
+   let  l:rcsc_file    = strpart(l:full_line, 6, l:word_end - 6)
+   "---(get the line number)------------------#
+   normal 0
+   normal 52lw
+   let  l:word_beg = col('.') - 1
+   normal e
+   let  l:word_end = col('.')
+   let  l:rcsc_line    = strpart(l:full_line, l:word_beg, l:word_end - l:word_beg) + 0
+   "---(get back to the original window)------#
+   normal ,a
+   let l:buf_num = bufnr(l:rcsc_file)
+   if (l:buf_num == -1)
+      echo "RSH_CSC_hints()          :: buffer not open in wim..."
+      return
+   else
+      silent exec('b! ' . l:buf_num)
+   endif
+   "---(get to the right line)----------------# make sure to show comments above
+   normal gg
+   silent! exec "normal " . (l:rcsc_line - 1) . "j"
+   silent! exec "normal z."
+   "---(do special highlighting)--------------#
+   "silent exec "highlight rsh_tag_match cterm=reverse"
+   "silent exec "match rsh_tag_match /".l:rtag_iden."/"
+   return
+endfunction
+
+
+function! RSH_CSC_replace()
+   "" TASK [0001][wa] create a verification version to make sure all changes are possible to avoid foul-ups
+   let  l:line_eof  = 0                          " end of file line number
+   let  l:count     = 1                          " current iteration
+   let  l:prog_line = 0
+   "---(check that a search is active)-----------#
+   if g:RSH_CSC_symbol == ""
+      echo "RSH_CSC_replace()        :: symbol not set, search first..."
+      return
+   endif
+   "---(get the replacement text)----------------#
+   let    l:tobe = input("change <<".g:RSH_CSC_symbol.">> to : ", g:RSH_CSC_symbol)
+   "---(verify the change)-----------------------#
+   let    l:confirm = input("change <<".g:RSH_CSC_symbol.">> to <<".l:tobe.">> (y/n/c) : ", "n")
+   if l:confirm != "y" && l:confirm != "c"
+      echo "RSH_CSC_replace()        :: canceled by user..."
+      return
+   endif
+   "---(do it)-----------------------------------#
+   echo "RSH_CSC_replace()        :: changing "
+   let  g:RSH_BUF_locked = "y"
+   let  g:RSH_TAG_locked = "y"
+   "---(get the csc window up)-------------------#
+   normal ,a
+   let l:prog_buf    = bufnr('%')     " get the tag buffer number
+   normal gt
+   let l:prog_line   = line('.')
+   call RSH_CSC_show()
+   let l:my_buf      = bufnr('%')     " get the tag buffer number
+   "---(get the last line)-----------------------#
+   normal "GG"
+   let  l:line_eof     = line('.')
+   "---(get the function names)------------------#
+   while l:count < l:line_eof
+      "---(get the next entry)-------------------#
+      normal gg
+      exec "normal ".l:count."j"
+      normal 0
+      let  l:full_line    = getline('.')
+      "---(get the file name)--------------------#
+      normal 7l
+      normal E
+      let  l:word_end = col('.')
+      let  l:rcsc_file    = strpart(l:full_line, 6, l:word_end - 6)
+      "---(get the line number)------------------#
+      normal 0
+      normal 52lw
+      let  l:word_beg = col('.') - 1
+      normal e
+      let  l:word_end = col('.')
+      let  l:rcsc_line    = strpart(l:full_line, l:word_beg, l:word_end - l:word_beg) + 0
+      "---(get to the right buffer)--------------#
+      normal ,a
+      let l:buf_num = bufnr(l:rcsc_file)
+      if (l:buf_num == -1)
+         echo "RSH_CSC_hints()          :: could not load ".l:rcsc_file." FATAL..."
+         return
+      endif
+      silent! exec('b! ' . l:buf_num)
+      "---(get to the right line)----------------# make sure to show comments above
+      normal gg
+      silent! exec "normal " . (l:rcsc_line - 1) . "j"
+      let   l:verify = search(g:RSH_CSC_symbol, "cW", l:rcsc_line)
+      let   l:its_col = col('.') - 2
+      silent! exec "normal ".strlen(g:RSH_CSC_symbol)."dl"
+      normal 0
+      if l:its_col < 0
+         silent! exec "normal i".l:tobe
+      elseif l:its_col == 0
+         silent! exec "normal a".l:tobe
+      else
+         silent! exec "normal ".l:its_col."l"
+         silent! exec "normal a".l:tobe
+      endif
+      echon "# "
+      "---(return to the csc buffer)-------------#
+      silent exec('b! ' . l:my_buf)
+      "---(get ready for the next loop)----------#
+      let l:count = l:count + 1
+   endwhile
+   "---(complete)--------------------------------#
+   setlocal nomodifiable
+   normal gg
+   normal ,a
+   silent! exec('b! ' . l:prog_buf)
+   normal gg
+   silent! exec "normal " . (l:prog_line - 1) . "j"
+   normal zt
+   let  g:RSH_TAG_locked = "n"
+   let  g:RSH_BUF_locked = "n"
+   echon "done."
+   return
+endfunction
+
+
+
+
+call RSH_CSC("start")
+""===[[ END ]]=================================================================#

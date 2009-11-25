@@ -1,0 +1,304 @@
+""=============================================================================#
+""
+""   system    : vim ide
+""   program   : rsh_buf.vim
+""   purpose   : provide simple buffer navigation within vim/ide
+""   language  : vim script
+""   author    : the_heatherlys
+""   written   : svq
+""
+""=============================================================================#
+
+
+
+
+""===[[ HEADER GUARD ]]========================================================#
+if exists('RSH_BUF_loaded')
+   finish
+endif
+let g:RSH_BUF_loaded = 1
+
+
+
+
+""===[[ GLOBALS ]]=============================================================#
+let g:RSH_BUF_title    = "e>_rsh_buf_explorer"
+let g:RSH_BUF_buf_list = ""
+let g:RSH_BUF_times    = 0
+let g:RSH_BUF_locked   = "n"
+
+augroup rsh_buf
+autocmd rsh_buf  VimEnter    * call RSH_BUF_start()
+autocmd rsh_buf  BufDelete   * call RSH_BUF_update()
+autocmd rsh_buf  BufDelete   * call RSH_BUF_update()
+
+command! -nargs=0 -bar  RBUFstart  call RSH_BUF_start()
+command! -nargs=0 -bar  RBUFclose  call RSH_BUF_stop()
+command! -nargs=0 -bar  RBUFtoggle call RSH_BUF_toggle()
+command! -nargs=0 -bar  RBUFupdate call RSH_BUF_update()
+
+nmap    ,0    :RBUFupdate<cr>
+
+
+
+
+""=============================================================================#
+""===[[ START/STOP ]]==========================================================#
+""=============================================================================#
+
+
+"create the buffer window
+function! RSH_BUF_start()
+   " HISTORY :: was called 'StopExplorer' in minibufexplorer
+   augroup rsh_buf
+   autocmd rsh_buf  BufEnter    * call RSH_BUF_update()
+   autocmd rsh_buf  BufDelete   * call RSH_BUF_update()
+   let g:RSH_BUF_buf_list = ""
+   call RSH_BUF_update()
+   endfunction
+
+
+"close the buffer window
+function! RSH_BUF_stop()
+   " HISTORY :: was called 'StopExplorer' in minibufexplorer
+   let l:win_num = RSH_BUF_find(g:RSH_BUF_title)
+   if (l:win_num != -1)
+      autocmd! rsh_buf
+      exec l:win_num.' wincmd w'
+      setlocal modifiable
+      silent! close
+      "wincmd p
+   endif
+   endfunction
+
+
+"flip the explorer off the back on
+function! RSH_BUF_toggle()
+   " HISTORY :: was called 'ToggleExplorer' in minibufexplorer
+   let l:win_num = RSH_BUF_find(g:RSH_BUF_title)
+   if (l:win_num != -1)
+      call RSH_BUF_stop()
+   else
+      call RSH_BUF_update()
+      wincmd p
+   endif
+   endfunction
+
+
+
+
+
+""=============================================================================#
+""===[[ UTILITY ]]=============================================================#
+""=============================================================================#
+
+
+"find a window number for a named buffer
+function! RSH_BUF_find(buf_name)
+   " HISTORY :: was called 'FindWindow' in minibufexplorer
+   let l:buf_num = bufnr(a:buf_name)
+   if (l:buf_num != -1)
+      let l:win_num = bufwinnr(l:buf_num)
+   else
+      let l:win_num = -1
+   endif
+   return l:win_num
+endfunction
+
+
+function! RSH_BUF_specific(buf_num)
+   if(a:buf_num != -1)             " If the buffer exists.
+      if (getbufvar(bufnr('%'), '&modifiable') == 1)
+         exec('b! ' . a:buf_num)
+      endif
+   endif
+   return
+endfunction
+
+
+function! RSH_BUF_select()
+   if bufname('%') != g:RSH_BUF_title
+      return
+   endif
+   let l:buf_num  = RSH_BUF_get()
+   wincmd p
+   call RSH_BUF_specific(l:buf_num)
+   return
+endfunction
+
+
+"return the buffer number for the buffer under the cursor.
+function! RSH_BUF_get()
+   " HISTORY :: was called 'GetSelectedBuffer' in minibufexplorer
+   if bufname('%') != g:RSH_BUF_title
+      return -1
+   endif
+   let l:buf_entry = expand("<cWORD>")
+   if (l:buf_entry == "")
+      return -1
+   else
+      let l:end = match(l:buf_entry, "]", 0) - 1
+      let l:rc  = strpart(l:buf_entry, 1, l:end)
+      echo l:rc
+      end
+      return l:rc
+   endif
+endfunction
+
+
+
+
+""=============================================================================#
+""===[[ WINDOW UPDATE CODE ]]==================================================#
+""=============================================================================#
+
+
+function! RSH_BUF_update()
+   " HISTORY :: was called 'AutoUpdate' in minibufexplorer
+   " don't update during updates :)
+      if (g:RSH_BUF_locked == "y")
+         return
+      endif
+   " remember the current win/buf
+      let l:buf_cur = bufnr('%')
+      "let l:win_cur = bufwinnr(l:buf_cur)
+   " don't update if just moving between protected windows
+      if (getbufvar(l:buf_cur, '&modifiable') == 0)
+         return
+      endif
+      if (getbufvar(l:buf_cur, '&buflisted') == 0)
+         return
+      endif
+   " start locking
+      let g:RSH_BUF_locked = "y"
+   " keep a counter for debugging/tuning
+      let g:RSH_BUF_times  = g:RSH_BUF_times + 1
+   " check for the explorer
+      let l:win_num = RSH_BUF_find(g:RSH_BUF_title)
+      if (l:win_num == -1)
+         call RSH_BUF_config()
+         let l:win_num = RSH_BUF_find(g:RSH_BUF_title)
+      endif
+      exec l:win_num.' wincmd w'
+   " update the buffer list
+      call RSH_BUF_list()
+   " get back to the original window (with new buffer)
+      let l:win_cur = bufwinnr(l:buf_cur)
+      if (l:win_cur != -1)
+         exec l:win_cur.' wincmd w'
+      endif
+   " done and returning to user
+   let g:RSH_BUF_locked = "n"
+   return
+endfunction
+
+
+function! RSH_BUF_config()
+   " was called 'StartExplorer' in minibufexplorer
+   call RSH_BUF_create()
+   if bufname('%') == g:RSH_BUF_title
+      setlocal modifiable
+      " structural addributes
+         setlocal noswapfile
+         setlocal buftype=nofile
+         setlocal filetype=nofile
+         setlocal bufhidden=delete
+         setlocal nobuflisted
+      " cosmetic attributes
+         setlocal winfixheight
+         setlocal nowrap
+         setlocal textwidth=1000
+         setlocal foldcolumn=0
+         setlocal nonumber
+         setlocal nocursorcolumn
+         setlocal nocursorline
+      " syntax highlighting
+         syntax clear
+         syntax match rsh_buf_times     '#[0-9]\+$'
+         syntax match rsh_buf_visible   '[0-9][0-9][>][A-Za-z0-9\._]\+ '
+         syntax match rsh_buf_changed   '[0-9][0-9][)][A-Za-z0-9\._]\+ '
+         syntax match rsh_buf_hidden    '[0-9][0-9]\][A-Za-z0-9\._]\+ '
+         syntax match rsh_buf_id        '[0-9][0-9][)>\]]' contained
+              \ containedin=rsh_buf_visible,rsh_buf_hidden,rsh_buf_changed
+         hi link rsh_buf_visible    function
+         hi link rsh_buf_hidden     keyword
+         hi link rsh_buf_changed    todo
+         hi link rsh_buf_times      comment
+         hi link rsh_buf_id         linenr
+      " key mapping
+         nnoremap <buffer> <cr>    :call RSH_BUF_select()<cr>:<bs>
+         nnoremap <buffer> <tab>   :call search('\[[0-9]*\]')<cr>:<bs>
+         nnoremap <buffer> <S-tab> :call search('\[[0-9]*\]','b')<cr>:<bs>
+      setlocal nomodifiable
+   endif
+   return
+endfunction
+
+
+" find or create the buffer window
+function! RSH_BUF_create()
+   " was called 'FindCreateWindow' in minibufexplorer
+   let l:win_num = RSH_BUF_find(g:RSH_BUF_title)
+   if (l:win_num != -1)
+      exec l:win_num.' wincmd w'
+   else
+      exec 'topleft split '.g:RSH_BUF_title
+      let  l:win_num = RSH_BUF_find(g:RSH_BUF_title)
+      exec l:win_num.' wincmd w'
+   endif
+   resize 1
+   return
+endfunction
+
+
+"recreate the buf_list
+function! RSH_BUF_list()
+   " HISTORY :: was called 'BuildBufferList' in minibufexplorer
+   let l:max_buf_num = bufnr('$')     " Get the number of the last buffer.
+   let l:buf_list    = ""
+   " Loop through every buffer less than the total number of buffers.
+   let l:i = 0                     " buffer index
+   while (l:i <= l:max_buf_num)
+      let l:i = l:i + 1
+      if (getbufvar(l:i, '&buflisted') == 1)
+         let l:buf_name = bufname(l:i)
+         if (strlen(l:buf_name))
+            if (getbufvar(l:i, '&modifiable') == 1)
+               let l:buf_short = fnamemodify(l:buf_name, ":t")
+               let l:buf_short = substitute(l:buf_short, '[][()]', '', 'g')
+               if (bufwinnr(l:i) != -1)
+                  let l:buf_mark = ">"
+               else
+                  if(getbufvar(l:i, '&modified') == 1)
+                     let l:buf_mark = ")"
+                  else
+                     let l:buf_mark = "]"
+                  endif
+               endif
+               let l:buf_list = l:buf_list . printf("%02d%s%-17.17s  ",
+                     \ l:i, l:buf_mark, l:buf_short)
+               exec "map ,".l:i."  :call RSH_BUF_specific(".l:i.")<cr>"
+               ""let l:buf_list = l:buf_list . strpart(l:tab, 0, 20)
+            endif
+         endif
+      endif
+   endwhile
+   if (g:RSH_BUF_buf_list != l:buf_list)
+      let g:RSH_BUF_buf_list = l:buf_list
+      call RSH_BUF_show()
+   endif
+   return
+endfunction
+
+
+function! RSH_BUF_show()
+   setlocal modifiable
+   1,$d _
+   let l:buf_list = g:RSH_BUF_buf_list . "  #". g:RSH_BUF_times
+   put! = l:buf_list
+   2,$d _
+   normal 0
+   setlocal nomodifiable
+   return
+endfunction
+

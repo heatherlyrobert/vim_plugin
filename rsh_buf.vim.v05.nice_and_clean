@@ -1,0 +1,385 @@
+""===[[ START HDOC ]]==========================================================#
+""===[[ HEADER ]]==============================================================#
+
+ "   niche         : integrated development environment
+ "   application   : rsh_buf.vim
+ "   purpose       : provide simple, efficient buffer navigation system for vim
+ "   base_system   : gnu/linux
+ "   lang_name     : vim script
+ "   created       : svq - long, long ago
+ "   author        : the_heatherlys
+ "   dependencies  : none (vim only)
+ "   permissions   : GPL-2 with no warranty of any kind
+ "
+ "
+""===[[ PURPOSE ]]=============================================================#
+
+ "   rsh_buf is a fast, clear, standard, and simple buffer tool to keep the
+ "   programmer focused on the programming rather than the fussy internals of
+ "   juggling  files, buffers, and windows.
+ "
+ "   overall, there are many advantages to editing several files in a single
+ "   editor session so that registers, marks, multiple copy buffers, ... can
+ "   be shared easily and can be seen side-by-side
+ "
+ "   but, there are also huge disadvantages to attemping to edit too many files
+ "   within a single editor session, including, confusion, forgotten buffers,
+ "   crash/recovery complexity, slower performance, file lock-outs ... so that
+ "   you should try to only open what you can use
+ "
+ "   also, it is very dangerous to have source from different programs or
+ "   libraries open in the same editor as confusion can cause some real editing
+ "   fiascos and issuses that may go undetected until the undo/redo history
+ "   is cleared
+ "
+ "   the cleanist solution for large scale editing appears to be...
+ "      - have multiple editor sessions running, each focused on a single thing
+ "      - within each session, group related code -- like source and header
+ "      - if files don't share symbols, keep them separate (like makefiles)
+ "
+ "   rsh_buf focuses on quick navigation as that is the most common use...
+ "      - plan on typical editing of two to four primary files
+ "      - maximum speed and efficiency appoach
+ "      - see all buffers on a single, unobtrusive line
+ "      - have an optional taller view if more filer are edited
+ "      - autoload the buffer window and show it up front
+ "      - be able to toggle on/off to save screen real-estate
+ "      - see all the open buffers once, including which is current
+ "      - switch buffer in current window quickly
+ "      - highlight changes and hidden buffers
+ "      - hide specialty or read-only windows as they are not for ediding anyway
+ "      - do everything with shortcuts (2 keys max) -- no mouse or tabbing
+ "
+ "   rejected features (in other buffer explorers)...
+ "      - do not have mouse or cursor selection features
+ "      - do not have a delete feature (not that common or required)
+ "      - no more that nine (9) buffers, keeps short cuts fast, fast, fast
+ "      - no extended views with additional information
+ "      - no cleaver buffer opening dialogs (put in elsewhere)
+ "
+ "
+ "   PRINCIPLE > write programs that do one thing well and do it well
+ "
+ "
+""===[[ END HDOC ]]============================================================#
+
+
+
+""===[[ HEADER GUARD ]]========================================================#
+if exists('RSH_BUF_hguard')
+   finish
+endif
+let g:RSH_BUF_hguard = 1
+
+
+
+""===[[ GLOBALS ]]=============================================================#
+let g:RSH_BUF_title    = "rsh_buf_buffers"
+let g:RSH_BUF_list     = ""
+let g:RSH_BUF_raw      = ""
+let g:RSH_BUF_locked   = "n"
+let g:RSH_BUF_bufs     = 0
+let g:RSH_BUF_arrange  = 1
+let g:RSH_BUF_times    = 0
+let g:RSH_BUF_shown    = 0
+
+
+
+""===[[ MAPPINGS ]]============================================================#
+command! -nargs=0 -count=0 RBUFtoggle   call RSH_BUF_toggle()
+command! -nargs=0 -count=0 RBUFtall     call RSH_BUF_tall_view()
+command! -nargs=0 -count=0 RBUFshow     call RSH_BUF_show()
+command! -nargs=0 -count=0 RBUFhide     call RSH_BUF_hide()
+"---(default mappings)---------------------------#
+nmap  ,0      :RBUFtoggle<cr>
+nmap  ,9      :RBUFtall<cr>
+nmap  ,a      :silent! exec "3 wincmd w"<cr>
+nmap  ,b      :silent! exec "4 wincmd w"<cr>
+nmap  ,c      :silent! exec "5 wincmd w"<cr>
+"---(whether or not its shown)-------------------#
+augroup rsh_buf
+autocmd rsh_buf  VimEnter    * call RSH_BUF_show()
+
+
+
+""===[[ MAIN ]]================================================================#
+
+function! RSH_BUF_main()
+   call RSH_BUF_create()
+   return
+endfunction
+
+
+
+""===[[ INITIALIZE ]]==========================================================#
+
+function! RSH_BUF_create()
+   silent! exec 'topleft split ' . g:RSH_BUF_title
+   call RSH_BUF_config()
+   hide
+   return
+endfunction
+
+function! RSH_BUF_config()
+   "---(prepare to update)-----------------------#
+   setlocal modifiable
+   "---(structural addributes)-------------------#
+   setlocal noswapfile
+   setlocal buftype=nofile
+   setlocal filetype=nofile
+   setlocal nobuflisted
+   setlocal bufhidden=hide
+   "---(cosmetic attributes)---------------------#
+   setlocal winfixheight
+   setlocal nowrap
+   setlocal textwidth=1000
+   setlocal foldcolumn=0
+   setlocal nonumber
+   setlocal nocursorcolumn
+   setlocal nocursorline
+   "---(syntax highlighting)---------------------#
+   syntax clear
+   syntax match rsh_buf_count     '^[0-9][0-9]'
+   syntax match rsh_buf_visible   '[0-9][>][A-Za-z0-9\._]\+ '
+   syntax match rsh_buf_changed   '[0-9][)][A-Za-z0-9\._]\+ '
+   syntax match rsh_buf_hidden    '[0-9]\][A-Za-z0-9\._]\+ '
+   syntax match rsh_buf_id        '[0-9][)>\]]' contained
+           \ containedin=rsh_buf_visible,rsh_buf_hidden,rsh_buf_changed
+   syntax match rsh_buf_timess    '[#][0-9]\+$'
+   hi rsh_buf_count  cterm=reverse,bold ctermbg=none ctermfg=5
+   hi link rsh_buf_visible    function
+   hi link rsh_buf_hidden     comment
+   hi link rsh_buf_changed    string
+   hi link rsh_buf_id         linenr
+   hi rsh_buf_timess  cterm=reverse,bold ctermbg=none ctermfg=4
+   "---(prepare to return)-----------------------#
+   setlocal nomodifiable
+   "---(complete)--------------------------------#
+   return
+endfunction
+
+
+
+""===[[ START/STOP ]]==========================================================#
+
+function! RSH_BUF_show()
+   "---(check for the buffer)--------------------#
+   let l:buf_num = bufnr(g:RSH_BUF_title)
+   if (l:buf_num < 1)
+      call RSH_BUF_create()
+   endif
+   "---(check for the window)--------------------#
+   let l:win_num = bufwinnr(l:buf_num)
+   if (l:win_num > 0)
+      silent exec l:win_num.' wincmd w'
+      hide
+   endif
+   "---(open the buffer window)------------------#
+   silent exec 'topleft split ' . g:RSH_BUF_title
+   resize 1
+   g:RSH_BUF_shown    = 1
+   wincmd p
+   "---(update)----------------------------------#
+   call RSH_BUF_update()
+   "---(return to last window)-------------------#
+   augroup rsh_buf
+   autocmd rsh_buf  BufWinEnter    * call RSH_BUF_update()
+   autocmd rsh_buf  BufWinLeave    * call RSH_BUF_update()
+   "---(complete)--------------------------------#
+   return
+endfunction
+
+function! RSH_BUF_hide()
+   "---(check for the buffer)--------------------#
+   let l:buf_num = bufnr(g:RSH_BUF_title)
+   if (l:buf_num < 1)
+      return
+   endif
+   "---(check for the window)--------------------#
+   let l:win_num = bufwinnr(l:buf_num)
+   if (l:win_num < 1)
+      return
+   endif
+   "---(open the buffer window)------------------#
+   autocmd! rsh_buf
+   augroup! rsh_buf
+   silent exec l:win_num.' wincmd w'
+   hide
+   g:RSH_BUF_shown    = 0
+   "---(complete)--------------------------------#
+   return
+endfunction
+
+function! RSH_BUF_toggle()
+   "---(check for the buffer)--------------------#
+   let l:buf_num = bufnr(g:RSH_BUF_title)
+   if (l:buf_num < 1)
+      call RSH_BUF_show()
+      return
+   endif
+   "---(check for the window)--------------------#
+   let l:win_num = bufwinnr(l:buf_num)
+   if (l:win_num > 0)
+      call RSH_BUF_hide()
+   else
+      call RSH_BUF_show()
+   endif
+   "---(complete)--------------------------------#
+   return
+endfunction
+
+function! RSH_BUF_tall_view()
+   "---(check for the buffer)--------------------#
+   let l:buf_num = bufnr(g:RSH_BUF_title)
+   if (l:buf_num < 1)
+      return
+   endif
+   "---(check for the window)--------------------#
+   let l:win_num = bufwinnr(l:buf_num)
+   if (l:win_num < 1)
+      return
+   endif
+   "---(complete)--------------------------------#
+   silent exec l:win_num.' wincmd w'
+   setlocal modifiable
+   if winheight('.') > 1
+      resize 1
+      setlocal nowrap
+   else
+      resize 2
+      setlocal wrap
+   endif
+   setlocal nomodifiable
+   wincmd p
+   return
+endfunction
+
+function! RSH_BUF_specific(buf_name)
+   "don't bother updating if just moving between protected windows
+   let l:buf_cur = bufnr('%')
+   if (getbufvar(l:buf_cur, '&modifiable') == 0)
+      echon "RSH_BUF_specific()  :: can not load a new buffer in specialty window..."
+      return
+   endif
+   if (getbufvar(l:buf_cur, '&buflisted') == 0)
+      echon "RSH_BUF_specific()  :: can not load a new buffer in specialty window..."
+      return
+   endif
+   let l:buf_num = bufnr(a:buf_name)
+   if  l:buf_num == l:buf_cur
+      echon "RSH_BUF_specific()  :: buffer (".l:buf_num.") already loaded in this window..."
+      return
+   endif
+   if(l:buf_num < 1)
+      echon "RSH_BUF_specific()  :: buffer number less that 1, can not load..."
+      return
+   endif
+   silent exec('b! ' . l:buf_num)
+   echon "RSH_BUF_specific()  :: moved to (".l:buf_num.") ".a:buf_name
+   return
+endfunction
+
+
+
+""===[[ WINDOW UPDATE CODE ]]==================================================#
+
+function! RSH_BUF_update()
+   "---(do not allow recursion)------------------#
+   if (g:RSH_BUF_locked == "y")
+      return
+   endif
+   "---(check for the buffer)--------------------#
+   let l:buf_num = bufnr(g:RSH_BUF_title)
+   if (l:buf_num < 1)
+      return
+   endif
+   "---(check for the window)--------------------#
+   let l:win_num = bufwinnr(l:buf_num)
+   if (l:win_num < 1)
+      return
+   endif
+   "---(check for special buffers)---------------#
+   let l:buf_cur = bufnr('%')
+   if (getbufvar(l:buf_cur, '&modifiable') == 0)
+      return
+   endif
+   if (getbufvar(l:buf_cur, '&buflisted') == 0)
+      return
+   endif
+   "---(start updating)--------------------------#
+   silent exec l:win_num.' wincmd w'
+   "---(start locked code)-----------------------#
+   let g:RSH_BUF_locked = "y"
+   let g:RSH_BUF_times  += 1
+   call RSH_BUF_list()
+   let g:RSH_BUF_locked = "n"
+   "---(return to previous window)---------------#
+   wincmd p
+   "---(complete)--------------------------------#
+   return
+endfunction
+
+function! RSH_BUF_list()
+   let l:max_buf_num = bufnr('$')     " get the number of the last buffer.
+   let l:buf_list    = ""             " initialize the buffer list
+   let l:buf_raw     = ""             " initialize the buffer simple list
+   let l:i = 0                        " buffer index
+   let g:RSH_BUF_bufs = 0             " count of buffers
+   "" process the buffers
+   while (l:i <= l:max_buf_num)
+      let l:i = l:i + 1
+      if (getbufvar(l:i, '&buflisted') == 1)               ">> only show listed
+         let l:buf_name = bufname(l:i)
+         if (strlen(l:buf_name))
+            if (getbufvar(l:i, '&modifiable') == 1)        ">> only show modifiables
+               "" get the basic name
+               let l:buf_short = fnamemodify(l:buf_name, ":t")
+               let l:buf_short = substitute(l:buf_short, '[][()]', '', 'g')
+               "" create meaningful/highlightable markings
+               if (bufwinnr(l:i) != -1)
+                  let l:buf_mark = ">"
+               else
+                  if(getbufvar(l:i, '&modified') == 1)
+                     let l:buf_mark = ")"
+                  else
+                     let l:buf_mark = "]"
+                  endif
+               endif
+               "" add to the buffer list
+               let g:RSH_BUF_bufs += 1
+               let l:buf_list .= printf("%d%s%-18.18s ",
+                     \ g:RSH_BUF_bufs, l:buf_mark, l:buf_short)
+               let l:buf_raw  .= l:buf_name . " "
+               "---(map to numbers)--------------#
+               if g:RSH_BUF_bufs < 9
+                  silent exec 'map ,'.g:RSH_BUF_bufs.'  :call RSH_BUF_specific("'.l:buf_name.'")<cr>'
+               endif
+            endif
+         endif
+      endif
+   endwhile
+   "---(update if changed)-----------------------#
+   if (g:RSH_BUF_list != l:buf_list)
+      let g:RSH_BUF_list = l:buf_list
+      let g:RSH_BUF_raw  = l:buf_raw
+      call RSH_BUF_paste()
+   endif
+   "---(complete)--------------------------------#
+   return
+endfunction
+
+function! RSH_BUF_paste()
+   setlocal modifiable                           " prepare to update
+   1,$d _                                        " delete all existing lines
+   let  l:buf_list = printf("%02d ", g:RSH_BUF_bufs) . g:RSH_BUF_list . "#" . g:RSH_BUF_times
+   put! = l:buf_list                             " put list in buffer
+   2,$d _                                        " delete all but first line
+   normal 0                                      " go to beginning of line
+   setlocal nomodifiable                         " turn off updating
+   return
+endfunction
+
+
+
+call RSH_BUF_main()
+""===[[ END ]]=================================================================#

@@ -1,0 +1,120 @@
+#!/bin/awk -f
+
+BEGIN {
+   FS  = "( )**";
+   g_num_lines     = 0;
+}
+
+
+function list_type(a_type) {
+   g_num_print = 0;
+   for (x = 1; x <= g_num_lines; x++)
+      if (g_ctag[x,2] == a_type) ++g_num_print;
+   if (g_num_print == 0) return;
+   printf("%s (%d)\n", a_type, g_num_print);
+   for (x = 1; x <= g_num_lines; x++) {
+      if (g_ctag[x,2] == a_type) {
+         ++g_hint_minor;
+         if (g_hint_minor > 26) {
+            ++g_hint_major;
+            g_hint_minor = 1;
+         }
+         # these column separators make later regex matting unambiguous
+         printf("%c%c  %-40.40s  #1#  %-5d  #2#  %s  #3#  %s  #4#  \n",
+                g_hint_major + 96, g_hint_minor + 96, g_ctag[x,1],
+                g_ctag[x,3], g_file_name, g_ctag[x,1]);
+      }
+   }
+   printf("\n");
+}
+
+NR == 1 {
+   printf("%-40.40s    FILE\n\n", g_file_name);
+}
+
+$1 ~ /^[A-Za-z]/ {
+   # store the tag-type
+   g_ident  = $1;
+   g_type   = $2;
+   g_line   = $3;
+   g_file   = $4;
+   g_class  = "";
+   # parse out the regex field
+   g_length = length($4);
+   g_start  = index($0, $4) + g_length + 1;
+   g_regex  = substr($0, g_start);
+   # test for class structure
+   g_class1 = index($1, "::");
+   g_class2 = index(g_regex, "::");
+   # couple of renaming items for clarity
+   if (g_type == "variable")  g_type  = "global var";
+   if (g_type == "local")     g_type  = "local var";
+   #  break out of loop as these are duplicates
+   if (g_type == "function" && g_class2 > 0) {
+      if (g_class1 != 0) {
+         g_type  = "method";
+         g_ident = substr($1, g_class1 + 2);
+         g_class = substr($1, 0,  g_class1 - 1);
+      } else next;
+   }
+   #  break out of loop as these are duplicates
+   if (g_type == "member" && g_file ~ /[.][ch].*$/) {
+      if (g_class1 != 0) {
+         g_ident = substr($1, g_class1 + 2);
+         g_class = substr($1, 0,  g_class1 - 1);
+      } else next;
+   }
+   #  break out of loop as these are duplicates
+   if (g_type == "prototype" && g_file ~ /[.]hpp$/) {
+      if (g_class1 != 0) {
+         g_ident = substr($1, g_class1 + 2);
+         g_class = substr($1, 0,  g_class1 - 1);
+      } else next;
+   }
+   # if (g_type == "prototype" && g_file !~ /[.]hpp$/) next;
+   #  break out of loop as these are duplicates
+   if (g_type == "function" && g_file ~ /[.]hpp$/) {
+      if (g_class1 != 0) {
+         g_type  = "method";
+         g_ident = substr($1, g_class1 + 2);
+         g_class = substr($1, 0,  g_class1 - 1);
+      } else next;
+   }
+   # process the entry
+   ++g_num_lines;
+   g_ctag[g_num_lines,1] = g_ident;
+   g_ctag[g_num_lines,2] = g_type;
+   g_ctag[g_num_lines,3] = g_line;
+   g_ctag[g_num_lines,4] = g_file;
+   g_ctag[g_num_lines,5] = g_regex;
+   g_ctag[g_num_lines,6] = g_class;
+}
+
+
+END {
+   list_type("method")
+   list_type("prototype")
+   list_type("function")
+
+   list_type("namespace")
+
+   list_type("macro")
+   list_type("externvar")
+   list_type("global var")
+   list_type("constant")
+   list_type("enum")
+   list_type("struct")
+   list_type("union")
+
+   list_type("label")
+   list_type("augroup")
+   list_type("exception")
+
+   list_type("class")
+   list_type("member")
+   list_type("local var")
+   list_type("typedef")
+
+   printf("%d\n%d\n", g_hint_major, g_hint_minor);
+   exit 0;
+}

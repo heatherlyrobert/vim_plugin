@@ -1,0 +1,34 @@
+""===[[ START HDOC ]]==========================================================#
+""===[[ HEADER ]]==============================================================#
+
+"   niche         : vim-ide (integrated development environment)
+"   application   : rsh_wrk.vim
+"   purpose       : provide work, task, and todo management capability
+"   base_system   : gnu/linux
+"   lang_name     : vim script
+"   created       : 2009-06
+"   author        : the_heatherlys
+"   dependencies  : none (vim only)
+"   permissions   : GPL-2 with no warranty of any kind
+"
+"
+""===[[ PURPOSE ]]=============================================================#
+
+"   rsh_wrk is a fast, simple, standard, and integrated tool for creating and
+"   sharing decentralized tasks that have been documented in there proper
+"   source context, such as in a c source file or a howto document.  this tool
+"   will be supplemented by a graphical visualiser and a central repository
+"   so that work is fast and easy to review, compare, update, and share
+"
+"   the primary capabilities of rsh_wrk are...
+"      - add a templeted tasks
+"      - consolidate tasks for current or all buffers
+"      - get new task indexes from the central repository
+"
+"
+""===[[ TODOS ]]===============================================================#
+
+"
+""===[[ END HDOC ]]============================================================#
+
+"" cGold

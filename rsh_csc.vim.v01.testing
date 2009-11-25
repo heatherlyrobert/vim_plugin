@@ -1,0 +1,370 @@
+""===[[ START HDOC ]]==========================================================#
+""===[[ HEADER ]]==============================================================#
+
+ "   niche         : integrated development environment
+ "   application   : rsh_csc.vim
+ "   purpose       : provide cscope x-ref and search access inside vim
+ "   base_system   : gnu/linux
+ "   lang_name     : vim script
+ "   created       : svq - long, long ago
+ "   author        : the_heatherlys
+ "   dependencies  : none (vim only)
+ "   permissions   : GPL-2 with no warranty of any kind
+ "
+ "
+""===[[ PURPOSE ]]=============================================================#
+
+ "   rsh_csc is a fast, clear, standard, and integrated x-ref tool based on
+ "   cscope to allow a programmer to rapidly understand and move through
+ "   a group of source files
+ "
+ "
+""===[[ END HDOC ]]============================================================#
+
+
+
+""===[[ HEADER GUARD ]]========================================================#
+if exists('RSH_CSC_hguard')
+   finish
+endif
+let g:RSH_CSC_hguard = 1
+
+
+""===[[ GLOBALS ]]=============================================================#
+let g:RSH_CSC_title    = "c>_rsh_cscope"
+let g:RSH_CSC_times    = 0
+let g:RSH_CSC_locked   = "n"
+let g:RSH_CSC_curbuf   = -1
+let g:RSH_CSC_line     = 0
+let g:RSH_CSC_lines    = 0
+let g:RSH_CSC_current  = ""
+
+
+
+let s:acs_query_cnt = 0	" Number of queries in the query list window.
+let s:acs_csres_pattern = "/\=\f "
+let g:acs_cscope_dir = "/home/dotsuu/z_gehye/"
+let s:acs_active_query = 0 " The index of the selected query in the
+let s:curr_view   = 0
+let s:curr_symbol = ""
+
+command! -nargs=* ACSstart call ACS_start(<f-args>)
+command! -nargs=* ACSfindsym call ACS_find_symbol(<f-args>)
+" Key bindings
+noremap  ;a   :ACSfindsym 0 <c-r>=expand("<cword>")<cr><cr>
+noremap  ;b   :ACSfindsym 1 <c-r>=expand("<cword>")<cr><cr>
+noremap  ;c   :ACSfindsym 2 <c-r>=expand("<cword>")<cr><cr>
+noremap  ;d   :ACSfindsym 3 <c-r>=expand("<cword>")<cr><cr>
+noremap  ;e   :ACSfindsym 4 <c-r>=expand("<cword>")<cr><cr>
+noremap  ;f   :ACSfindsym 6 <c-r>=expand("<cword>")<cr><cr>
+noremap  ;g   :ACSfindsym 7 <c-r>=expand("<cword>")<cr><cr>
+noremap  ;h   :ACSfindsym 8 <c-r>=expand("<cword>")<cr><cr>
+nnoremap ;k   :call ACS_show_prev()<cr>
+nnoremap ;j   :call ACS_show_next()<cr>
+nnoremap ;n   :call ACS_show_clear()<cr>
+
+command! -nargs=0 RCSCquery   call RSH_CSC_query()
+
+
+""===[[ HOOK UP DATABASE ]]====================================================#
+cs add cscope.out
+silent! exec "new " . g:RSH_CSC_title
+setlocal nomodifiable
+close
+
+
+
+" ==============================================================================
+" jumps to the next cscope entry
+function! ACS_show_clear()
+   execute 'silent! syntax clear ACSmatch'
+	let s:acs_qres_{s:acs_active_query}_{s:curr_view}_5 = "  "
+   let s:curr_view = 0
+   call ACS_goto_respos(-1)
+endfunction
+
+
+
+" ==============================================================================
+" jumps to the next cscope entry
+function! ACS_show_next()
+   if s:curr_view <= s:acs_qrescnt_{s:acs_active_query} - 1
+	   let s:acs_qres_{s:acs_active_query}_{s:curr_view}_5 = "  "
+      let s:curr_view = s:curr_view + 1
+	   let s:acs_qres_{s:acs_active_query}_{s:curr_view}_5 = ">>"
+   endif
+   call ACS_goto_respos(s:curr_view)
+endfunction
+
+
+
+" ==============================================================================
+" jumps to the next cscope entry
+function! ACS_show_prev()
+   if s:curr_view > 0
+	   let s:acs_qres_{s:acs_active_query}_{s:curr_view}_5 = "  "
+      let s:curr_view = s:curr_view - 1
+	   let s:acs_qres_{s:acs_active_query}_{s:curr_view}_5 = ">>"
+   endif
+   call ACS_goto_respos(s:curr_view)
+endfunction
+
+
+
+" ==============================================================================
+" Jumps at a query result.
+" Opens the file to edit and jumps at the proper line.
+"
+" The query result window must be the active one when
+" calling this function!
+"function! s:ACS_goto_respos(qnum)
+function! ACS_goto_respos(qnum)
+   "---(GUARD PROGRAMMING)-----------------------#
+	if s:acs_query_cnt == 0
+		return
+	endif
+	" if no query is activated then the res window shows
+	" the res for the last query
+	if s:acs_active_query == 0
+		let s:acs_active_query = s:acs_query_cnt
+	endif
+	" get the index of the query result
+   if a:qnum > 0
+      let idx = a:qnum
+   elseif a:qnum == -1
+      let idx = 0
+   else
+	   let idx = line('.') - 1
+   endif
+	if idx > s:acs_qrescnt_{s:acs_active_query}
+		return
+	endif
+   " RSH START
+   execute 'silent! syntax clear ACSmatch'
+   wincmd l
+   wincmd l
+   wincmd j
+   wincmd j
+   wincmd l
+   wincmd l
+   wincmd j
+   wincmd j
+   wincmd k
+   execute 'silent! syntax clear ACSmatch'
+   wincmd l
+   execute 'silent! syntax clear ACSmatch'
+	if a:qnum != -1
+	   " [open the file and] goto the line number
+   	exec 'edit ' . s:acs_qres_{s:acs_active_query}_{idx}_1
+   	exec s:acs_qres_{s:acs_active_query}_{idx}_3
+      let [x_row,x_col] = searchpos(s:curr_symbol,"",s:acs_qres_{s:acs_active_query}_{idx}_3)
+      "let x_col = x_col - 1
+      "exec 'normal 100h'
+      "exec 'normal ' . x_col . 'l'
+      "exec ':echo search("' . s:curr_symbol . '")'
+      execute 'silent! syntax clear ACSmatch'
+      execute 'highlight ACSmatch cterm=bold ctermbg=4 ctermfg=6'
+      execute 'syntax match ACSmatch "' . s:curr_symbol . '" containedin=ALL'
+   else
+      wincmd h
+	endif
+   " RSH STOP
+	"let s:acs_qres_{s:acs_active_query}_{idx}_5 = ">>"
+	call s:ACS_populate_reswin(s:acs_active_query)
+	" remember the target
+	"let s:acs_pos_stack_{s:acs_stack_top}_file = expand("%:p")
+	"let s:acs_pos_stack_{s:acs_stack_top}_line = line('.')
+endfunction
+
+
+
+" ==============================================================================
+" Parses the output of cscope
+function! s:ACS_parse_res(res, qidx)
+	let cmd_output = a:res
+	"if cmd_output ~= 'cscope: 0 lines'
+	"	return 0
+	"endif
+	" parse line-by-line
+	let i = 0
+	while cmd_output != ''
+		" Extract one line at a time
+		let one_line = strpart(cmd_output, 0, stridx(cmd_output, "\n"))
+		" Remove the line from the output
+		let cmd_output = strpart(cmd_output, stridx(cmd_output, "\n") + 1)
+		"if one_line ~= '^cscope:'
+			" skip this informational line
+		"	continue
+		"endif
+		let i = i + 1
+		let jj = 1
+		" A result consists of 3 parts: file name, function name,
+		" line number, context.
+		while jj <= 3
+			let s:acs_qres_{a:qidx}_{i}_{jj} = strpart(one_line, 0, stridx(one_line, " "))
+			let one_line = strpart(one_line, stridx(one_line, " ") + 1)
+			let jj = jj + 1
+		endwhile
+		let s:acs_qres_{a:qidx}_{i}_{jj} = one_line
+		let s:acs_qres_{a:qidx}_{i}_{5}  = "  "
+	endwhile
+	return i
+endfunction
+
+
+
+" ==============================================================================
+" Adds content to the query result window.
+function! s:ACS_populate_reswin(qidx)
+	let qres_win = bufwinnr(g:RSH_CSC_title)
+	let oldwin = winnr()
+	" goto query res window
+	exe qres_win . "wincmd w"
+	setlocal modifiable
+	exe '1,$delete'
+	if a:qidx == 0
+		call append(0, "There are now queries.")
+		setlocal nomodifiable
+		exe oldwin . "wincmd w"
+		return
+	endif
+	call append(0, "cscope_results_for : '" . s:acs_queryname_{a:qidx} . "'  ( " .  s:curr_view .  " of " . s:acs_qrescnt_{a:qidx} . " )" )
+	if s:acs_qrescnt_{a:qidx} == 0
+		call append(1, "No result!")
+	else
+		let i = 1
+		while i <= s:acs_qrescnt_{a:qidx}
+			let jj = 1
+			let line = ""
+         " RSH START
+			let line = line . strpart(s:acs_qres_{a:qidx}_{i}_{5} . "                      ", 0,  2) . " "
+			let line = line . strpart(s:acs_qres_{a:qidx}_{i}_{1} . "                      ", 0, 15) . " "
+			let line = line . strpart(s:acs_qres_{a:qidx}_{i}_{2} . "                      ", 0, 15) . " "
+			let line = line . strpart(s:acs_qres_{a:qidx}_{i}_{3} . "                      ", 0,  5) . " "
+			let line = line . strpart(s:acs_qres_{a:qidx}_{i}_{4} . "                                            ", 0,100) . " "
+         " RSH END
+			call append(i, line)
+			let i = i + 1
+		endwhile
+	endif
+	setlocal nomodifiable
+	exe oldwin . "wincmd w"
+endfunction
+
+
+
+" ==============================================================================
+" Executes a query.
+function! ACS_find_symbol(ndx, symbol)
+	let cur_win = winnr()
+	let cur_dir = getcwd()
+	let s:acs_query_cnt = s:acs_query_cnt + 1
+	let s:curr_view     = 0
+	" Set up the query title
+	if a:ndx == 0
+		let s:acs_queryname_{s:acs_query_cnt} = "REF " . a:symbol
+	elseif a:ndx == 1
+		let s:acs_queryname_{s:acs_query_cnt} = "DEF " . a:symbol
+	elseif a:ndx == 2
+		let s:acs_queryname_{s:acs_query_cnt} = "<-- " . a:symbol
+	elseif a:ndx == 3
+		let s:acs_queryname_{s:acs_query_cnt} = "--> " . a:symbol
+	elseif a:ndx == 4
+		let s:acs_queryname_{s:acs_query_cnt} = "TXT " . a:symbol
+	elseif a:ndx == 6
+		let s:acs_queryname_{s:acs_query_cnt} = "GRP " . a:symbol
+	elseif a:ndx == 7
+		let s:acs_queryname_{s:acs_query_cnt} = "FIL " . a:symbol
+	elseif a:ndx == 8
+		let s:acs_queryname_{s:acs_query_cnt} = "INC " . a:symbol
+	endif
+	" execute cscope query
+	let qcmd = "-" . a:ndx . a:symbol
+	let result = system("cd ". g:acs_cscope_dir ."; cscope -R -L " . qcmd)
+	" parse the result
+	let s:acs_qrescnt_{s:acs_query_cnt} = s:ACS_parse_res(result, s:acs_query_cnt)
+	call s:ACS_populate_reswin(s:acs_query_cnt)
+	let s:acs_active_query = s:acs_query_cnt
+	" go back
+	exe cur_win . "wincmd w"
+   execute 'silent! syntax clear ACSmatch'
+   execute 'highlight ACSmatch cterm=bold ctermbg=4 ctermfg=6'
+   execute 'syntax match ACSmatch "\<' . a:symbol . '\>" containedin=ALL'
+   let s:curr_symbol = a:symbol
+endfunction
+
+
+
+" ==============================================================================
+" Initializes the query result window
+function! s:ACS_init_queryres_win()
+	call append(0,"cscope_results_for")
+	setlocal nomodifiable
+	silent! setlocal buftype=nofile
+	silent! setlocal bufhidden=delete
+	silent! setlocal noswapfile
+	silent! setlocal nowrap
+	silent! setlocal nonumber
+   silent! setlocal nobuflisted
+   silent! setlocal hi cursorline cterm=reverse ctermbg=NONE ctermfg=NONE
+	nnoremap <buffer> <silent> <CR> :call <SID>ACS_goto_respos(0)<CR>
+	if has('syntax')
+		syntax keyword  QResTitle      cscope_results_for
+      hi link         QResTitle      type
+		syntax match    QResLineNum    '\<[1-9][0-9]*\>'
+      hi link         QResLineNum    keyword
+		syntax match    QResFileName   '^   [A-Za-z0-9._\\]*'
+      hi link         QResFileName   function
+		syntax match    QResCurrName   '^>>.*$'
+      hi link         QResCurrName   error
+	endif
+endfunction
+
+
+" ==============================================================================
+" main()
+function! ACS_start(...)
+	if a:0 == 0
+		if g:acs_cscope_dir == ''
+			echo "Set the cscope.out directory in g:acs_cscope_dir first!"
+			return
+		endif
+	else
+		let g:acs_cscope_dir = a:1
+	endif
+	let w:acs_window = "acs window"
+	" Init query res window
+   exec "normal ,a"
+   setlocal splitbelow
+   execute 'botright 15new '. g:RSH_CSC_title
+	call s:ACS_init_queryres_win()
+endfunction
+
+
+function! ACS_close(...)
+	if a:0 == 0
+		if g:acs_cscope_dir == ''
+			echo "Set the cscope.out directory in g:acs_cscope_dir first!"
+			return
+		endif
+	else
+		let g:acs_cscope_dir = a:1
+	endif
+	let w:acs_window = "acs window"
+	" Init query res window
+	exe 'botright 15new ' . g:RSH_CSC_title
+	call s:ACS_init_queryres_win()
+endfunction
+
+
+function! RSH_CSC_query()
+   setlocal modifiable
+   exec     ":1,$d"
+   return
+   exec ":silent 1,$!cscope -L -1is_good"
+   exec ":silent 1,$!_rsh_csc"
+   exec "normal 1O"
+   exec "normal iDEF for symbol <<is_good>>..."
+   "setlocal nomodifiable
+   return
+endfunction

@@ -1,0 +1,420 @@
+""=============================================================================#
+""
+""   system    : vim ide
+""   program   : rsh_fix.vim
+""   purpose   : provide a better quickfix interface within vim/ide
+""   language  : vim script
+""   author    : the_heatherlys
+""   written   : svq
+ "   permissions   : GPL-2 with no warranty of any kind
+""
+""=============================================================================#
+"" DESIGN NOTES
+""    - mark all functions with '!' so I can easily reload/overwrite the script
+""
+
+
+
+""===[[ HEADER GUARD ]]========================================================#
+if exists('RSH_FIX_hguard')
+   finish
+endif
+let g:RSH_FIX_hguard = 1
+
+
+""===[[ GLOBALS ]]=============================================================#
+let g:RSH_FIX_title    = "rsh_fix"
+let g:RSH_FIX_times    = 0
+let g:RSH_FIX_locked   = "n"
+let g:RSH_FIX_curbuf   = -1
+let g:RSH_FIX_line     = 0
+let g:RSH_FIX_lines    = 0
+let g:RSH_FIX_current  = ""
+
+
+""=============================================================================#
+""===[[ SERVICES INTERFACE ]]==================================================#
+""=============================================================================#
+
+
+function! RSH_FIX_start()
+   let  g:RSH_FIX_locked = "n"
+   call RSH_FIX_update()
+endfunction
+
+
+function! RSH_FIX_stop()
+   let  g:RSH_FIX_locked = "y"
+   let l:win_num = RSH_FIX_find()
+   if (l:win_num != -1)
+      exec l:win_num.' wincmd w'
+      setlocal modifiable
+      silent! close
+   endif
+endfunction
+
+
+function! RSH_FIX_restart()
+   call RSH_FIX_stop()
+   call RSH_FIX_start()
+endfunction
+
+
+function! RSH_FIX_pause()
+   let  g:RSH_FIX_locked = "y"
+endfunction
+
+
+function! RSH_FIX_zap()
+   call RSH_FIX_stop()
+endfunction
+
+
+""---(classic services interfaces)----------------------#
+command! -nargs=0       RFIXstart    call RSH_FIX_start()
+command! -nargs=0       RFIXstop     call RSH_FIX_stop()
+command! -nargs=0       RFIXrestart  call RSH_FIX_restart()
+command! -nargs=0       RFIXpause    call RSH_FIX_pause()
+command! -nargs=0       RFIXzap      call RSH_FIX_zap()
+command! -nargs=0       RFIXupdate   call RSH_FIX_update()
+command! -nargs=0       RFIXfocus    call RSH_FIX_focus()
+command! -nargs=0       RFIXnext     call RSH_FIX_next()
+command! -nargs=0       RFIXprev     call RSH_FIX_prev()
+command! -nargs=0       RFIXrestate  call RSH_FIX_restate()
+command! -nargs=0       RFIXhelp     call RSH_FIX_help()
+command! -nargs=0       RFIXclear    call RSH_FIX_clear()
+command! -nargs=0       RFIXshow     call RSH_FIX_show()
+""---(keymapping)---------------------------------------#
+nmap     ,q#           :RFIXfocus<cr>
+nmap     ,qq           :RFIXupdate<cr>
+nmap     ,qc           :RFIXstop<cr>
+nmap     ,qj           :RFIXnext<cr>
+nmap     ,qk           :RFIXprev<cr>
+nmap     ,q.           :RFIXrestate<cr>
+nmap     ,q?           :RFIXhelp<cr>
+nmap     ,qn           :RFIXclear<cr>
+
+
+""=============================================================================#
+""===[[ UTILITY ]]=============================================================#
+""=============================================================================#
+
+function! RSH_FIX_show()
+   echo "RSH_FIX_show()    :: entering..."
+   let l:buf_num = bufnr(g:RSH_FIX_title)
+   exec ',b'
+   exec "b! " . l:buf_num
+   return
+endfunction
+
+
+function! RSH_FIX_win_save()
+   echo "RSH_FIX_win_save()    :: entering..."
+   let g:RSH_FIX_curbuf = bufnr('%')
+   return
+endfunction
+
+
+function! RSH_FIX_win_restore()
+   echo "RSH_FIX_restore()    :: entering..."
+   let l:win_cur = bufwinnr(g:RSH_FIX_curbuf)
+   if (l:win_cur != -1)
+      exec l:win_cur.' wincmd w'
+   endif
+   return
+endfunction
+
+
+function! RSH_FIX_find()
+   echo "RSH_FIX_find()    :: entering..."
+   let l:buf_num = bufnr(g:RSH_FIX_title)
+   if (l:buf_num != -1)
+      let l:win_num = bufwinnr(l:buf_num)
+   else
+      let l:win_num = -1
+   endif
+   return l:win_num
+endfunction
+
+
+function! RSH_FIX_focus()
+   echo "RSH_FIX_focus()    :: entering..."
+   let l:win_num =  RSH_FIX_find()
+   if (l:win_num != -1)
+      exec l:win_num.' wincmd w'
+      let   l:buf_num = bufnr(g:RSH_FIX_title)
+      let   l:win_num = bufwinnr(l:buf_num)
+      echo "RSH_FIX_focus()    :: going to buf=" . l:buf_num . " and win=" . l:win_num . "..."
+   else
+      echo "RSH_FIX_focus()    :: did not find..."
+      "call RSH_FIX_create()
+   endif
+   return l:win_num
+endfunction
+
+
+
+
+""=============================================================================#
+""===[[ WINDOW UPDATE CODE ]]==================================================#
+""=============================================================================#
+
+
+function! RSH_FIX_clear()
+   echo "RSH_FIX_clear()    :: entering..."
+   execute "silent! syntax clear rsh_fix_identifier"
+   return
+endfunction
+
+
+function! RSH_FIX_help()
+   echo "quickfix help :: ',q'=focus  ',qq'=make  ';j'=down  ';k'=up  ';.'=curr"
+      \ "  ';0'=top  ';?=help"
+   return
+endfunction
+
+
+function! RSH_FIX_restate()
+   echo "RSH_FIX_restate()    :: entering..."
+   call RSH_FIX_goto()
+   echo "quickfix (" . g:RSH_FIX_line . " of " . g:RSH_FIX_lines . ")"
+      \ " :: " . strpart(g:RSH_FIX_current,2,126) . "::"
+   return
+endfunction
+
+
+function! RSH_FIX_goto()
+   echo "RSH_FIX_goto()    :: entering..."
+   let  l:filename = matchstr(g:RSH_FIX_current, "\[&&\].*\[##\]")
+   if (l:filename != "")
+      let  l:linenum     = matchstr(g:RSH_FIX_current, "\[##\].*\[@@\]")
+      let  l:deststring  = ">" . strpart(l:linenum,3,strlen(l:linenum)-6) . "<"
+      let  l:destline    = strpart(l:linenum,3,strlen(l:linenum)-6) + 0
+      execute ":silent! edit " . strpart(l:filename,3,strlen(l:filename)-6)
+      execute "normal " . l:destline . "G"
+      let  l:identifier  = matchstr(g:RSH_FIX_current, "\[@@\].*\[!!\]")
+      let  l:identifier  = strpart(l:identifier,3,strlen(l:identifier)-6)
+      let  [x_row,x_col] = searchpos(l:identifier,"",l:destline)
+      execute "silent! syntax clear rsh_fix_identifier"
+      execute "highlight link rsh_fix_identifier error"
+      execute "syntax match rsh_fix_identifier '" . l:identifier . "' containedin=ALL"
+   endif
+   echo "quickfix (" . g:RSH_FIX_line . " of " . g:RSH_FIX_lines . ")"
+      \ " :: " . strpart(g:RSH_FIX_current,2,126) . "::"
+   return
+endfunction
+
+
+function! RSH_FIX_next()
+   call RSH_FIX_win_save()
+   let  g:RSH_FIX_line += 1
+   if (g:RSH_FIX_line <= g:RSH_FIX_lines)
+      call RSH_FIX_focus()
+      setlocal modifiable
+      execute ":normal gg"
+      execute ":normal " . g:RSH_FIX_line . "j"
+      if (g:RSH_FIX_line > 1)
+         execute ":normal k"
+         execute ":normal 0R  "
+         execute ":normal j"
+      endif
+      execute ":normal 0R>>"
+      let g:RSH_FIX_current = getline(".")
+      setlocal nomodifiable
+      call RSH_FIX_win_restore()
+      call RSH_FIX_goto()
+   else
+      let  g:RSH_FIX_line = g:RSH_FIX_lines
+      echo "quickfix :: already at the last line"
+   endif
+   return
+endfunction
+
+
+function! RSH_FIX_prev()
+   call RSH_FIX_win_save()
+   let  g:RSH_FIX_line -= 1
+   if (g:RSH_FIX_line > 0)
+      call RSH_FIX_focus()
+      setlocal modifiable
+      execute ":normal gg"
+      execute ":normal " . g:RSH_FIX_line . "j"
+      if (g:RSH_FIX_line < g:RSH_FIX_lines )
+         execute ":normal j"
+         execute ":normal 0R  "
+         execute ":normal k"
+      endif
+      execute ":normal 0R>>"
+      let g:RSH_FIX_current = getline(".")
+      setlocal nomodifiable
+      call RSH_FIX_win_restore()
+      call RSH_FIX_goto()
+   else 
+      let  g:RSH_FIX_line = 1
+      echo "quickfix :: already at the top line"
+   endif
+   return
+endfunction
+
+
+
+""=============================================================================#
+""===[[ WINDOW UPDATE CODE ]]==================================================#
+""=============================================================================#
+
+
+
+function! RSH_FIX_update()
+   echo "RSH_FIX_update()    :: entering..."
+   " don't update during updates :)
+      if (g:RSH_FIX_locked == "y")
+         echo "RSH_FIX_update()    :: already compiling, locked!"
+         return
+      endif
+   " remember the current win/buf
+      call RSH_FIX_win_save()
+   " start locking
+      let g:RSH_BUF_locked = "y"
+      let g:RSH_TAG_locked = "y"
+      let g:RSH_FIX_locked = "y"
+   " keep a counter for debugging/tuning
+      echo "quickfix :: compilation underway..."
+      let g:RSH_FIX_times  = g:RSH_FIX_times + 1
+   " get to the taglist window
+      let l:win_num = RSH_FIX_find()
+      if (l:win_num == -1)
+         call RSH_FIX_config()
+         let l:win_num = RSH_FIX_find()
+      endif
+      exec l:win_num.' wincmd w'
+   " update the buffer list
+      call RSH_FIX_list()
+   " get back to the original window (with new buffer)
+      call RSH_FIX_win_restore()
+   "" give the status
+      
+   " done and returning to user
+   let g:RSH_FIX_locked = "n"
+   let g:RSH_BUF_locked = "n"
+   let g:RSH_TAG_locked = "n"
+   return
+endfunction
+
+
+function! RSH_FIX_config()
+   " was called 'StartExplorer' in minibufexplorer
+   " call RSH_FIX_focus()
+   echo "RSH_FIX_config()    :: entering..."
+   call RSH_FIX_focus()
+   " if bufname('.') == g:RSH_FIX_title
+   echo "RSH_FIX_config()    :: inside config..."
+      setlocal modifiable
+      " structural addributes
+      setlocal noswapfile
+      setlocal buftype=nofile
+      setlocal filetype=nofile
+      setlocal nobuflisted
+   echo "RSH_FIX_config()    :: 2nd config..."
+      " commmon cosmetic attributes
+      setlocal nowrap
+      setlocal nonumber
+      setlocal nocursorcolumn
+      setlocal nocursorline
+      " cosmetic attributes
+      setlocal winfixheight
+      setlocal textwidth=1000
+      " syntax highlighting
+   " arsoitenarstinarts
+      let   l:buf_num = bufnr(g:RSH_FIX_title)
+      let   l:win_num = bufwinnr(l:buf_num)
+      echo "RSH_FIX_focus()    :: going to buf=" . l:buf_num . " and win=" . l:win_num . "..."
+   echo "RSH_FIX_config()    :: 3rd config..."
+      :syntax
+      syntax clear
+   echo "RSH_FIX_config()    :: 4th config..."
+      :syntax
+      "" errors
+      syntax match rsh_fix_err_summ           '^.*(FAIL).*$'
+      syntax match rsh_fix_err_line           '^.. [E]  .*$'
+      syntax match rsh_fix_err_curr           '^>> [E] '
+         \ containedin=rsh_fix_err_line
+      hi link rsh_fix_err_summ      error
+      hi link rsh_fix_err_line      todo
+      hi link rsh_fix_err_curr      error
+   echo "RSH_FIX_config()    :: 5th config..."
+      :syntax
+      "" linker errors
+      syntax match rsh_fix_lnk_summ           '^.*(LINK).*$'
+      syntax match rsh_fix_lnk_line           '^.. [L]  .*$'
+      syntax match rsh_fix_lnk_curr           '^>> [L] '
+         \ containedin=rsh_fix_lnk_line
+      hi link rsh_fix_lnk_summ      error
+      hi link rsh_fix_lnk_line      todo
+      hi link rsh_fix_lnk_curr      error
+      "" warnings
+      syntax match rsh_fix_war_summ           '^.*(warn).*$'
+      syntax match rsh_fix_war_line           '^.. [-]  .*$'
+      syntax match rsh_fix_war_curr           '^>> [-] '
+         \ containedin=rsh_fix_war_line
+      hi rsh_fix_war_summ           cterm=none    ctermbg=1    ctermfg=3
+      hi link rsh_fix_war_line      preproc
+      hi link rsh_fix_war_curr      rsh_fix_war_summ
+      "" messages
+      syntax match rsh_fix_pas_summ           '^.*(pass).*$'
+      syntax match rsh_fix_pas_line           '^.. [*]  .*$'
+      syntax match rsh_fix_pas_curr           '^>> [*] '
+         \ containedin=rsh_fix_pas_line
+      hi rsh_fix_pas_summ           cterm=none    ctermbg=2    ctermfg=none
+      hi link rsh_fix_pas_line      comment
+      hi link rsh_fix_pas_curr      rsh_fix_pas_summ
+      "" parts
+      syntax match rsh_fix_linenum            '\<[1-9][0-9]*\>'
+         \ containedin=rsh_fix_err_line, rsh_fix_war_line
+      hi link rsh_fix_linenum keyword
+      setlocal nomodifiable
+   " endif
+   echo "RSH_FIX_config()    :: exiting..."
+      :syntax
+   return
+endfunction
+
+
+"recreate the fix_list
+function! RSH_FIX_list()
+   echo "RSH_FIX_list()    :: entering..."
+   setlocal modifiable
+   normal 1,$d
+   exec ":silent 1,$!make"
+   exec ":silent 1,$!_quickfix"
+   let  g:RSH_FIX_lines = line('$') - 1
+   let  g:RSH_FIX_line  = 0
+   let  g:RSH_FIX_current = getline(".")
+   setlocal nomodifiable
+   echo "quickfix results"
+      \ " :: " . strpart(g:RSH_FIX_current,0,126) . "::"
+   return
+endfunction
+
+
+" find or create the buffer window
+function! RSH_FIX_create()
+   echo "RSH_FIX_create()    :: entering..."
+   exec "normal ,b"
+   setlocal splitbelow
+   exec 'split '.g:RSH_FIX_title
+   call RSH_FIX_focus()
+   resize 15
+   return
+endfunction
+
+
+
+""===[[ SETUP ]]===============================================================#
+echo "main()             :: entering..."
+silent! exec "new " . g:RSH_FIX_title
+echo "main()             :: window created..."
+call RSH_FIX_config()
+echo "main()             :: configured..."
+:syntax
+"hide
+echo "main()             :: closing..."

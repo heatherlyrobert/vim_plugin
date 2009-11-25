@@ -1,0 +1,376 @@
+""===[[ START HDOC ]]==========================================================#
+""===[[ HEADER ]]==============================================================#
+
+ "   niche         : integrated development environment
+ "   application   : rsh_tag.vim
+ "   purpose       : smooth ctags navigation within vim/ide
+ "   base_system   : gnu/linux
+ "   lang_name     : vim script
+ "   created       : svq - long, long ago
+ "   author        : the_heatherlys
+ "   dependencies  : none (vim only)
+ "   permissions   : GPL-2 with no warranty of any kind
+ "
+ "
+""===[[ PURPOSE ]]=============================================================#
+
+ "   rsh_tag is a fast, clear, standard, and simple tag navigation tool to
+ "   provide the programmer with a categorized table of global symbols for all
+ "   buffers open in the current vim session
+ "
+ "   this tool is meant to provide...
+ "      - an inventory of all global symbols in the file
+ "      - to work with all major programming and scripting languages
+ "      - quick, short-cut based navigation within a file/window
+ "      - and nothing else
+ "
+ "
+""===[[ END HDOC ]]============================================================#
+
+
+
+""===[[ HEADER GUARD ]]========================================================#
+if exists('RSH_TAG_hguard')
+   finish
+endif
+let g:RSH_TAG_hguard = 1
+
+
+
+""===[[ GLOBALS ]]=============================================================#
+let g:RSH_TAG_title    = "t>_rsh_ctags"
+let g:RSH_TAG_ctags    = "exuberant-ctags"
+let g:RSH_TAG_locked   = "n"
+
+
+
+""===[[ AUTO COMMANDS ]]=======================================================#
+augroup rsh_tag
+"autocmd rsh_tag  VimEnter    * call RSH_BUF_start()
+"autocmd rsh_tag  BufDelete   * call RSH_BUF_update()
+
+command! -nargs=0 -bar  RTAGstart      call RSH_TAG_start()
+command! -nargs=0 -bar  RTAGclose      call RSH_TAG_stop()
+command! -nargs=0 -bar  RTAGtoggle     call RSH_TAG_toggle()
+command! -nargs=0 -bar  RTAGupdate     call RSH_TAG_update()
+command! -nargs=0 -bar  RTAGhints      call RSH_TAG_hints()
+command! -nargs=0 -bar  RTAGchange     call RSH_TAG_change()
+
+nmap        ,t       :RTAGtoggle<cr>
+map         ;;       :RTAGhints<cr>
+
+autocmd BufEnter,BufRead,BufNewFile * RTAGchange
+
+
+
+
+"===[[ START/STOP ]]===========================================================#
+
+
+function! RSH_TAG_change()
+   let l:buf_cur = bufnr('%')
+   let l:win_num = RSH_TAG_find(g:RSH_TAG_title)
+   if (l:win_num != -1)
+      exec l:win_num.' wincmd w'
+   endif
+   let l:full_name = bufname(l:buf_cur)
+   let l:base_loc  = match(l:full_name,"[A-Za-z0-9_.]*$")
+   let l:base_name = strpart(l:full_name,l:base_loc)
+   call search("^".l:base_name)
+   execute "normal zt"
+   let l:win_cur = bufwinnr(l:buf_cur)
+   if (l:win_cur != -1)
+      exec l:win_cur.' wincmd w'
+   endif
+endfunction
+
+
+function! RSH_TAG_hints()
+   "---(defensive programming)----------------#
+   if (getbufvar(bufnr('%'), '&modifiable') != 1)
+      echo "RSH_TAG_hints() :: can not use this as an editing window..."
+      return
+   endif
+   "---(get the tag id)-----------------------#
+   echo   "enter tag text : "
+   let    l:x_one = printf("%c", getchar())
+   echon  l:x_one
+   let    l:x_two = printf("%c", getchar())
+   echon  l:x_two
+   let    l:x_tag = l:x_one . l:x_two
+   if (l:x_tag == "")
+      return
+   endif
+   "---(switch to tag window)-----------------#
+   let    l:buf_cur = bufnr('%')
+   let    l:win_num = RSH_TAG_find(g:RSH_TAG_title)
+   if (l:win_num != -1)
+      exec l:win_num.' wincmd w'
+   endif
+   exec   ":normal gg"
+   "---(find the tag)-------------------------#
+   call   search("^" . l:x_tag . "  ")
+   if line(".") == 1
+      return
+   endif
+   let  l:full_line   = getline(".")
+   "---(parse the tag entry)------------------#
+   let  l:rtag_file    = matchstr(l:full_line, "  #1  .*  #2  ")
+   let  l:rtag_file    = strpart(l:rtag_file, 6, strlen(l:rtag_file) - 12)
+   let  l:rtag_line    = matchstr(l:full_line, "  #2  .*  #3  ")
+   let  l:rtag_line    = strpart(l:rtag_line, 6, strlen(l:rtag_line) - 12) - 1
+   let  l:rtag_iden    = matchstr(l:full_line, "  #3  .*  #4  ")
+   let  l:rtag_iden    = strpart(l:rtag_iden, 6, strlen(l:rtag_iden) - 12)
+   "---(highlight the tag)--------------------#
+   execute "silent! syntax clear rsh_tag_identifier"
+   execute "hi link rsh_tag_identifier function"
+   execute "syntax match rsh_tag_identifier '" . l:rtag_iden . "' containedin=ALL"
+   "---(get back to the original window)------#
+   let l:win_cur = bufwinnr(l:buf_cur)
+   if (l:win_cur != -1)
+      exec l:win_cur.' wincmd w'
+   endif
+   "---(get to the right buffer)--------------#
+   if bufname('%') != l:rtag_file
+      let l:buf_num = bufnr(l:rtag_file)
+      if (l:buf_num == -1)
+         echo "RSH_TAG_hints() :: buffer not open in wim..."
+         return
+      else
+         exec('b! ' . l:buf_num)
+      endif
+   endif
+   "---(get to the right line)----------------#
+   execute ":normal gg"
+   execute ":normal " . l:rtag_line . "j"
+   execute "normal z."
+   return
+endfunction
+
+
+"create the buffer window   else
+function! RSH_TAG_start()
+   call RSH_TAG_update()
+   wincmd p
+endfunction
+
+
+"close the buffer window
+function! RSH_TAG_stop()
+   " HISTORY :: was called 'StopExplorer' in minibufexplorer
+   let l:win_num = RSH_TAG_find(g:RSH_TAG_title)
+   if (l:win_num != -1)
+      exec l:win_num.' wincmd w'
+      setlocal modifiable
+      silent! close
+      "wincmd p
+   endif
+endfunction
+
+
+"flip the explorer off the back on
+function! RSH_TAG_toggle()
+   " HISTORY :: was called 'ToggleExplorer' in minibufexplorer
+   let l:win_num = RSH_TAG_find(g:RSH_TAG_title)
+   if (l:win_num != -1)
+      call RSH_TAG_stop()
+   else
+      call RSH_TAG_update()
+      wincmd p
+   endif
+endfunction
+
+
+
+""===[[ UTILITY ]]=============================================================#
+
+"find a window number for a named buffer
+function! RSH_TAG_find(buf_name)
+   let l:buf_num = bufnr(a:buf_name)
+   if (l:buf_num != -1)
+      let l:win_num = bufwinnr(l:buf_num)
+   else
+      let l:win_num = -1
+   endif
+   return l:win_num
+endfunction
+
+
+
+""===[[ WINDOW UPDATE CODE ]]==================================================#
+
+function! RSH_TAG_update()
+   " don't update during updates :)
+      if (g:RSH_TAG_locked == "y")
+         return
+      endif
+   " remember the current win/buf
+      let l:buf_cur = bufnr('%')
+      "let l:win_cur = bufwinnr(l:buf_cur)
+   " start locking
+      let g:RSH_BUF_locked = "y"
+      let g:RSH_TAG_locked = "y"
+   " get to the taglist window
+      let l:win_num = RSH_TAG_find(g:RSH_TAG_title)
+      if (l:win_num == -1)
+         call RSH_TAG_config()
+         let l:win_num = RSH_TAG_find(g:RSH_TAG_title)
+      endif
+      exec l:win_num.' wincmd w'
+   " update the buffer list
+      call RSH_TAG_list()
+   " get back to the original window (with new buffer)
+      let l:win_cur = bufwinnr(l:buf_cur)
+      if (l:win_cur != -1)
+         exec l:win_cur.' wincmd w'
+      endif
+   " done and returning to user
+   let g:RSH_TAG_locked = "n"
+   let g:RSH_BUF_locked = "n"
+   return
+endfunction
+
+
+function! RSH_TAG_config()
+   " was called 'StartExplorer' in minibufexplorer
+   call RSH_TAG_create()
+   if bufname('%') == g:RSH_TAG_title
+      setlocal modifiable
+      " structural addributes
+         setlocal noswapfile
+         setlocal buftype=nofile
+         setlocal bufhidden=delete
+         setlocal nobuflisted
+      " commmon cosmetic attributes
+         setlocal nowrap
+         setlocal nonumber
+         setlocal nocursorcolumn
+         setlocal nocursorline
+      " cosmetic attributes
+         setlocal winfixwidth
+         setlocal textwidth=1000
+      " folding for taglist
+         setlocal foldenable
+         setlocal foldcolumn=0
+         setlocal foldminlines=0
+         setlocal foldmethod=manual
+         setlocal foldlevel=9999
+         " setlocal foldtext=v:folddashes.getline(v:foldstart)
+      " other attributes
+         setlocal filetype=taglist
+      " syntax highlighting
+         syntax clear
+         syntax match rsh_tag_file               '^[A-Za-z0-9_.-]\+[ ]\+FILE'
+         syntax match rsh_tag_major              '^[a-z].*([0-9]\+)$'
+         syntax match rsh_tag_context            '^  [a-z][a-z][a-z] [=].*'
+         syntax match rsh_tag_detail             '^[a-z][a-z]  .*'
+         syntax match rsh_tag_tag                '^[a-z][a-z]  ' containedin=rsh_tag_detail
+         hi rsh_tag_file     cterm=reverse,bold  ctermbg=none   ctermfg=5
+         hi rsh_tag_major    cterm=bold          ctermbg=none   ctermfg=5
+         hi rsh_tag_context  cterm=none          ctermbg=none   ctermfg=3
+         hi rsh_tag_detail   cterm=none          ctermbg=none   ctermfg=0
+         hi rsh_tag_tag      cterm=bold          ctermbg=none   ctermfg=4
+      setlocal nomodifiable
+   endif
+   return
+endfunction
+
+
+"recreate the buf_list
+function! RSH_TAG_list()
+   " HISTORY :: was called 'BuildBufferList' in minibufexplorer
+   let l:win_num = RSH_TAG_find(g:RSH_TAG_title)
+   if (l:win_num != -1)
+      exec l:win_num.' wincmd w'
+   endif
+   setlocal modifiable
+   let l:max_buf_num = bufnr('$')     " Get the number of the last buffer.
+   let l:buf_list    = ""
+   " Loop through every buffer less than the total number of buffers.
+   let l:i = 0                     " buffer index
+   " ********************* BEGIN
+   " Ignore the filetype autocommands
+   let old_eventignore = &eventignore
+   set eventignore=FileType
+   " Save the 'filetype', as this will be changed temporarily
+   let old_filetype = &filetype
+   " ********************* END
+   let l:g_hint_major = 1
+   let l:g_hint_minor = 0
+   exec "normal 1,$d"
+   while (l:i <= l:max_buf_num)
+      let l:i = l:i + 1
+      if (getbufvar(l:i, '&buflisted') == 1)
+         if (getbufvar(l:i, '&modifiable') == 1)
+            "if (l:i <= 3)
+               let l:full_name = bufname(l:i)
+               let l:base_loc  = match(l:full_name,"[A-Za-z0-9_.]*$")
+               let l:base_name = strpart(l:full_name,l:base_loc)
+               let l:path_name = strpart(l:full_name,0,l:base_loc)
+               if (l:path_name == "")
+                  let l:path_name = "~"
+               endif
+               " ********************* BEGIN
+               " Run filetypedetect group of autocommands to determine filetype
+               exe 'doautocmd filetypedetect BufRead ' . l:full_name
+               " ********************* END
+               let l:buf_type  = &filetype
+               if (l:buf_type == "cpp")
+                  let l:buf_type = "c++"
+               endif
+               let &filetype = old_filetype
+               exec "$"
+               exec "normal i\b\b\b".l:base_name."                                    FILE\n"
+               exec "normal i  loc = ".l:path_name."\n"
+               exec "normal i  syn = ".l:buf_type."\n"
+               exec "normal i  lin = "
+               exec ":r !cat ".l:full_name." | wc -l"
+               exec "normal k"
+               exec "normal J"
+               exec "$"
+               exec "normal o\n"
+               exec "normal mx"
+               exec "normal o\n"
+               exec ":silent $!exuberant-ctags -x --language-force=".l:buf_type." --sort=no --fields=+afiksSmz --extra=+q --c-kinds=+pxl --c++-kinds=+pxl --file-scope=yes ".l:full_name
+               exec "normal 'x"
+               exec ":silent .,$!_ctags 'g_hint_major=".l:g_hint_major."' 'g_hint_minor=".l:g_hint_minor."' 'g_file_name=".l:base_name."'"
+               exec "$"
+               let l:g_hint_minor = getline('.')
+               exec "normal dd"
+               let l:g_hint_major = getline('.')
+               exec "normal dd"
+               exec "normal 50o"
+               exec "$"
+            "endif
+         endif
+      endif
+   endwhile
+   execute "$"
+   execute "normal 100o"
+   execute "normal gg"
+   " ********************* BEGIN
+   " Restore the previous state
+   let &filetype = old_filetype
+   let &eventignore = old_eventignore
+   " ********************* END
+   setlocal nomodifiable
+   return
+endfunction
+
+
+" find or create the buffer window
+function! RSH_TAG_create()
+   " was called 'FindCreateWindow' in minibufexplorer
+   let l:win_num = RSH_TAG_find(g:RSH_TAG_title)
+   if (l:win_num != -1)
+      exec l:win_num.' wincmd w'
+   else
+      exec 'vert split '.g:RSH_TAG_title
+      let  l:win_num = RSH_TAG_find(g:RSH_TAG_title)
+      exec l:win_num.' wincmd w'
+   endif
+   vert resize 20
+   return
+endfunction
+
+
