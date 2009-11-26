@@ -68,6 +68,7 @@
 ""===[[ GLOBALS ]]=============================================================#
 let g:hbuf_title    = "HBUF_buffer"              " buf/win title
 let g:hbuf_list     = ""                         " formatted list
+let g:hbuf_raw      = ""                         " unformatted list
 let g:hbuf_locked   = "n"                        " y/n hands off flag
 let g:hbuf_times    = 0                          " great debug/perf monitor
 

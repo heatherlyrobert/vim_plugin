@@ -56,6 +56,9 @@ let g:hcsc_locked   = "n"
 "---(script/general)-----------------------------#
 let s:hcsc_title    = "HCSC_buffer"
 let s:hcsc_size     = 10
+let s:hcsc_type     = " "
+let s:hcsc_matches  = 0
+let s:hcsc_matchstr = ""
 
 "---(script/search)------------------------------#
 let s:hcsc_soption     = ""
@@ -67,6 +70,7 @@ let s:hcsc_scurr       = ""
 let s:hcsc_sbufname    = ""
 let s:hcsc_ssubject    = ""
 let s:hcsc_sscope      = ""
+let s:hcsc_sshort      = ""
 let s:hcsc_smessage    = ""
 
 "---(script/tag)---------------------------------#
@@ -90,6 +94,7 @@ function! s:HCSC_init()
    call HALL_start()
    call s:HCSC_syntax()
    call s:HCSC_keys()
+   call s:HCSC_sparms("d")
    setlocal nomodifiable
    hide
    return
@@ -109,12 +114,16 @@ function! s:HCSC_syntax()
    hi hcsc_mtag     cterm=bold   ctermbg=none  ctermfg=4
    hi hcsc_ftag     cterm=bold   ctermbg=none  ctermfg=4
    hi hcsc_num      cterm=bold   ctermbg=none  ctermfg=5
-   syntax match hcsc_count    ' [0-9][0-9]* '        containedin=hcsc_sum
-   syntax match hcsc_search   '^? :: .*$'
-   syntax match hcsc_sum      '^grep/cscope .*$'
-   hi hcsc_search   cterm=none   ctermbg=1     ctermfg=none
+   syntax match hcsc_count    '| [0-9][0-9][0-9] |'        containedin=hcsc_sum
+   syntax match hcsc_search   '^w=.*$'
+   syntax match hcsc_sum      '^HCSC .*$'
+   syntax match hcsc_end      '^end of matches .*$'
+   syntax match hcsc_empty    '^NO MATCHES FOUND .*$'
+   hi hcsc_search   cterm=none   ctermbg=2     ctermfg=none
    hi hcsc_sum      cterm=none   ctermbg=2     ctermfg=none
    hi hcsc_count    cterm=none   ctermbg=3     ctermfg=none
+   hi hcsc_end      cterm=none   ctermbg=2     ctermfg=none
+   hi hcsc_empty    cterm=none   ctermbg=1     ctermfg=none
    return
 endfunction
 
@@ -123,25 +132,49 @@ endfunction
 "===[ LEAF   ]===> establish the buffer specific key mapping
 function! s:HCSC_keys()
    nmap          ,g       :call HCSC_show(expand("<cword>"), expand("<cWORD>"))<cr>
-   "---(types of searches)---------------------------#
-   nmap <buffer>  a       :call HCSC_search("a")<cr>
-   nmap <buffer>  A       :call HCSC_search("A")<cr>
-   nmap <buffer>  b       :call HCSC_search("b")<cr>
-   nmap <buffer>  B       :call HCSC_search("B")<cr>
-   nmap <buffer>  p       :call HCSC_search("p")<cr>
-   nmap <buffer>  P       :call HCSC_search("P")<cr>
+   "---(search types)--------------------------------#
+   nmap <buffer>  c       :call HCSC_search("c")<cr>
+   nmap <buffer>  w       :call HCSC_search("w")<cr>
+   nmap <buffer>  W       :call HCSC_search("W")<cr>
    nmap <buffer>  s       :call HCSC_search("s")<cr>
-   nmap <buffer>  S       :call HCSC_search("S")<cr>
    nmap <buffer>  y       :call HCSC_search("y")<cr>
-   nmap <buffer>  Y       :call HCSC_search("Y")<cr>
+   "---(search scopes)-------------------------------#
+   nmap <buffer>  a       :call HCSC_search("a")<cr>
+   nmap <buffer>  d       :call HCSC_search("d")<cr>
+   nmap <buffer>  v       :call HCSC_search("v")<cr>
+   nmap <buffer>  b       :call HCSC_search("b")<cr>
+   nmap <buffer>  f       :call HCSC_search("f")<cr>
    "---(presentation/size)---------------------------#
    nmap <buffer>  -       :call HCSC_resize("-")<cr>
    nmap <buffer>  +       :call HCSC_resize("+")<cr>
    nmap <buffer>  h       :call HCSC_hide()<cr>
    "---(replacement)---------------------------------#
-   nmap <buffer>  v       :call HCSC_replace(1)<cr>
+   nmap <buffer>  t       :call HCSC_replace(1)<cr>
    nmap <buffer>  r       :call HCSC_replace(2)<cr>
-   "nmap          ;r       :call RSH_CSC_replace()<cr>
+   return
+endfunction
+
+
+function! s:HCSC_unkeys()
+   "---(search types)--------------------------------#
+   nunmap <buffer>  c
+   nunmap <buffer>  w
+   nunmap <buffer>  W
+   nunmap <buffer>  s
+   nunmap <buffer>  y
+   "---(search scopes)-------------------------------#
+   nunmap <buffer>  a
+   nunmap <buffer>  d
+   nunmap <buffer>  v
+   nunmap <buffer>  b
+   nunmap <buffer>  f
+   "---(presentation/size)---------------------------#
+   nunmap <buffer>  -
+   nunmap <buffer>  +
+   nunmap <buffer>  h
+   "---(replacement)---------------------------------#
+   nunmap <buffer>  t
+   nunmap <buffer>  r
    return
 endfunction
 
@@ -235,55 +268,46 @@ endfunction
 function! s:HCSC_sparms(type)
    setlocal noignorecase
    setlocal nosmartcase
-   let  s:hcsc_soption   = a:type
-   if     a:type == "A"
+   if     a:type == "a"           " all files scope
+      let  s:hcsc_sscope   = '*.{c,h,cpp,hpp,unit,vim,sh}'
+      let  s:hcsc_sshort   = "dirtree"
+      let  s:hcsc_smessage = "in dirtree (".s:hcsc_sscope.")"
+   elseif a:type == "d"           " directory scope
+      let  s:hcsc_sscope   = '*.{c,h,cpp,hpp,unit,vim,sh}'
+      let  s:hcsc_sshort   = "directory"
+      let  s:hcsc_smessage = "in current dir (".s:hcsc_sscope.")"
+   elseif a:type == "v"           " vim buffers scope   FIXME
+      let  s:hcsc_sscope   = g:hbuf_raw
+      let  s:hcsc_sshort   = "vim"
+      let  s:hcsc_smessage = "in all vim buf (".g:hbuf_raw.")"
+   elseif a:type == "b"           " buffer scope
+      let  s:hcsc_sscope   = s:hcsc_sbufname
+      let  s:hcsc_sshort   = "buffer"
+      let  s:hcsc_smessage = "in current buf (".s:hcsc_sbufname.")"
+   elseif a:type == "f"           " function scope      FIXME
+      let  s:hcsc_sscope   = s:hcsc_sbufname
+      let  s:hcsc_sshort   = "function"
+      let  s:hcsc_smessage = "in current func (".s:hcsc_sbufname.")"
+   elseif a:type == "w"
       let  s:hcsc_ssubject = s:hcsc_sword1
-      let  s:hcsc_sscope   = '*.{c,h,cpp,hpp,vim,sh}'
-      let  s:hcsc_smessage = "in all programs (c,h,cpp,hpp,vim,sh) in current directory..."
-   elseif a:type == "a"
-      let  s:hcsc_ssubject = s:hcsc_sword1
-      let  s:hcsc_sscope   = s:hcsc_sbufname
-      let  s:hcsc_smessage = "in just the ".s:hcsc_sscope." program file..."
-   elseif a:type == "B"
+      let  s:hcsc_soption = a:type
+   elseif a:type == "W"
       let  s:hcsc_ssubject = s:hcsc_sword2
-      let  s:hcsc_sscope   = '*.{c,h,cpp,hpp,vim,sh}'
-      let  s:hcsc_smessage = "in all programs (c,h,cpp,hpp,vim,sh) in current directory..."
-   elseif a:type == "b"
-      let  s:hcsc_ssubject = s:hcsc_sword2
-      let  s:hcsc_sscope   = s:hcsc_sbufname
-      let  s:hcsc_smessage = "in just the ".s:hcsc_sscope." program file..."
-   elseif a:type == "P"
-      if (s:hcsc_scurr ==  "")
-         return -1
-      endif
+      let  s:hcsc_soption = a:type
+   elseif a:type == "c"
       let  s:hcsc_ssubject = s:hcsc_scurr
-      let  s:hcsc_sscope   = '*.{c,h,cpp,hpp,vim,sh}'
-      let  s:hcsc_smessage = "in all programs (c,h,cpp,hpp,vim,sh) in current directory..."
-   elseif a:type == "p"
-      if (s:hcsc_scurr ==  "")
-         return -1
-      endif
-      let  s:hcsc_ssubject = s:hcsc_scurr
-      let  s:hcsc_sscope   = s:hcsc_sbufname
-      let  s:hcsc_smessage = "in just the ".s:hcsc_sscope." program file..."
-   elseif a:type == "S"
-      let  s:hcsc_ssubject = s:hcsc_sregex
-      let  s:hcsc_sscope   = '*.{c,h,cpp,hpp,vim,sh}'
-      let  s:hcsc_smessage = "in all programs (c,h,cpp,hpp,vim,sh) in current directory..."
+      let  s:hcsc_soption = a:type
    elseif a:type == "s"
       let  s:hcsc_ssubject = s:hcsc_sregex
-      let  s:hcsc_sscope   = s:hcsc_sbufname
-      let  s:hcsc_smessage = "in just the ".s:hcsc_sscope." program file..."
-   elseif a:type == "Y"
-      let  s:hcsc_ssubject = s:hcsc_syank
-      let  s:hcsc_sscope   = '*.{c,h,cpp,hpp,vim,sh}'
-      let  s:hcsc_smessage = "in all programs (c,h,cpp,hpp,vim,sh) in current directory..."
+      let  s:hcsc_soption = a:type
    elseif a:type == "y"
       let  s:hcsc_ssubject = s:hcsc_syank
-      let  s:hcsc_sscope   = s:hcsc_sbufname
-      let  s:hcsc_smessage = "in just the ".s:hcsc_sscope." program file..."
+      let  s:hcsc_soption = a:type
    else
       return -2
+   endif
+   if s:hcsc_ssubject == ""
+      return -1
    endif
    let  s:hcsc_scurr  = s:hcsc_ssubject
    return 0
@@ -310,41 +334,58 @@ function! HCSC_search(type)
    call HALL_lock()
    "---(clean off old data)----------------------#
    setlocal modifiable
+   call s:HCSC_unkeys()
    normal "GG"
    let  l:line_eof     = line('.')
-   if (l:line_eof > 1)
-      exec ":2,$delete"
+   if (l:line_eof > 2)
+      silent! exec ":3,$delete"
    endif
    normal o
    "---(find with grep)--------------------------#
    exec ":silent $!grep --line-number --with-filename --no-messages --word-regexp \"".s:hcsc_ssubject."\" ".s:hcsc_sscope
    "---(clean with awk)--------------------------#
-   silent! exec ":silent! 2,$!rsh_csc.awk 'g_hmajor=".l:hmajor."' 'g_hminor=".l:hminor."' 'g_symbol=".s:hcsc_ssubject."' 'g_scope=".s:hcsc_smessage."' 'g_option=".s:hcsc_soption."'"
+   silent! exec ":silent! 3,$!rsh_csc.awk 'g_hmajor=".l:hmajor."' 'g_hminor=".l:hminor."' 'g_symbol=".s:hcsc_ssubject."' 'g_scope=".s:hcsc_smessage."' 'g_option=".s:hcsc_soption."'"
+   "---(get the last line)-----------------------#
+   normal "GG"
+   let  l:line_eof = line('.')
+   if (l:line_eof < 3)
+      "---(get a no matches line in)-------------#
+      normal o
+      normal 0
+      exec "normal iNO MATCHES FOUND                                                                                                                "
+      let  s:hcsc_matches  = 0
+   else
+      "---(get key information back)-------------#
+      normal gg
+      normal jj
+      normal 0
+      normal ww
+      let  l:word_beg = col('.') - 1
+      normal e
+      let  l:word_end = col('.')
+      let  l:full_line = getline('.')
+      let  s:hcsc_matches  = strpart(l:full_line, l:word_beg, l:word_end - l:word_beg) + 0
+      normal dd
+   endif
    "---(set match syntax)------------------------#
    execute 'silent! syntax clear hcsc_match'
    execute 'highlight hcsc_match cterm=bold ctermbg=4 ctermfg=6'
    execute 'syntax match hcsc_match "\<' .s:hcsc_ssubject. '\>" containedin=ALL'
-   "---(get the last line)-----------------------#
+   "---(get the function names)------------------#
    normal "GG"
    let  l:line_eof = line('.') - 2
    let  l:entry    = 1
-   if (l:entry > l:line_eof)
-      normal o
-      normal 0
-      exec "normal igrep/cscope has 0 matches...                                                                                            "
-   endif
-   "---(get the function names)------------------#
-   while l:entry <= l:line_eof
+   while l:entry <  l:line_eof
       exec "normal ".(l:entry + 2)."G"
       call s:HCSC_parse()
       let  l:replace = HTAG_findloc(s:hcsc_file, s:hcsc_line)
       call s:HCSC_fixtag(l:replace)
-      let l:entry = l:entry + 1
+      let  l:entry = l:entry + 1
    endwhile
    "---(complete)--------------------------------#
    call  s:HCSC_topline()
    normal gg
-   setlocal nomodifiable
+   call s:HCSC_keys()
    call HBUF_restore()
    call HALL_unlock()
    return
@@ -385,21 +426,32 @@ function! s:HCSC_parse()
    return 1
 endfunction
 
+function! s:HCSC_justtopline()
+   setlocal modifiable
+   call s:HCSC_unkeys()
+   call s:HCSC_topline()
+   call s:HCSC_keys()
+   setlocal nomodifiable
+   return 0
+endfunction
 
 
 function! s:HCSC_topline()
-   let l:linenum = line('.')
+   let l:linenum     = line('.')
+   let l:prev_text   = "<".s:hcsc_scurr.">"
+   let l:search_text = "w=<".s:hcsc_sword1.">  "."W=<".s:hcsc_sword2.">  "."s=<".s:hcsc_sregex.">"
+   ""    "y=<".s:hcsc_syank. ">  ".
    normal gg
+   silent! exec ":1,2delete"
    normal 0
-   exec "normal R? :: ".
-            \ " p=<".s:hcsc_scurr.">  ".
-            \ " a=<".s:hcsc_sword1.">  ".
-            \ " b=<".s:hcsc_sword2.">  ".
-            \ " s=<".s:hcsc_sregex.">  ".
-            \ " y=<".s:hcsc_syank.">  ".
-            \ "                                                                  "
+   exec "normal O".printf("HCSC | c(%1.1s)=%-35.35s | %03d | scope=%-9.9s | a:all, d:dir, v:vim, b:buf, f:fun", s:hcsc_soption, l:prev_text, s:hcsc_matches, s:hcsc_sshort)
+            \ ."                                                                  "
+   exec "normal o"
+   exec "normal i".printf("%-71.71s | r:rep, t:tst, h:hid, +:big, -:sma", l:search_text)
+            \ ."                                                                  "
    normal 0
    normal gg
+   setlocal nomodifiable
    "silent! exec "normal " . (l:linenum - 1) . "j"
    "silent! exec "normal z."
    return
@@ -410,7 +462,11 @@ endfunction
 function! s:HCSC_fixtag(tagtext)
    normal 0
    normal 25l
-   exec "normal R".a:tagtext
+   if (strlen(a:tagtext) <= 25)
+      exec "normal R".printf("%-25.25s", a:tagtext)
+   else
+      exec "normal R".printf("%-24.24s>", a:tagtext)
+   endif
    let l:its_buf = bufnr(s:hcsc_file)
    if l:its_buf < 1
       let l:its_buf = '-'
@@ -434,11 +490,13 @@ function! HCSC_hints(tag)
       echon "  -- CSC not open, can not process..."
    endif
    silent exec l:win_num.' wincmd w'
+   silent! call s:HCSC_unkeys()        " get the key mappings off
    normal gg
    "---(find the tag)-------------------------#
    call   search("^" . a:tag . "  ")
    if line(".") < 2
       echon "  -- tag not found, can not process..."
+      silent! call s:HCSC_keys()
       return
    endif
    normal 0
@@ -455,6 +513,8 @@ function! HCSC_hints(tag)
    normal e
    let  l:word_end = col('.')
    let  l:rcsc_line    = strpart(l:full_line, l:word_beg, l:word_end - l:word_beg) + 0
+   "---(get the keys back on)-----------------#
+   silent! call s:HCSC_keys()
    "---(get back to the original window)------#
    normal ,a
    let l:buf_num = bufnr(l:rcsc_file)

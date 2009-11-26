@@ -372,6 +372,37 @@ function! HTAG_list()
    silent exec ":1,$delete"
    setlocal nomodifiable
    "---(loop through the valid buffers)----------#
+   setlocal modifiable
+   "---(run the tags)----------------#
+   silent! exec "$:!ctags -x --sort=no --c-kinds=cdefgnpstuvx --c++-kinds=cdefgnpstuvx --file-scope=yes *"
+   "---(go back and awk them)--------#
+   silent! exec ":silent! 0,$!rsh_tag.awk 'g_hint_major=".l:g_hint_major."' 'g_hint_minor=".l:g_hint_minor."'"
+   "---(collect the 'last tag')------#
+   normal GG
+   let l:g_hint_minor = getline('.')
+   normal Dk
+   let l:g_hint_major = getline('.')
+   normal D
+   setlocal nomodifiable
+   "---(go back and awk them)--------#
+   "silent! normal 'x
+   "call HTAG_func_syn(l:base_name)
+   normal gg
+   return
+endfunction
+
+
+
+"===[ BRANCH ]===> create tag list for all active buffers <====================#
+function! HTAG_list_BUFSONLY()
+   ""---(prepare locals)-------------------------#
+   let l:g_hint_major = 1
+   let l:g_hint_minor = 0
+   ""---(clear out existing contents)------------#
+   setlocal modifiable
+   silent exec ":1,$delete"
+   setlocal nomodifiable
+   "---(loop through the valid buffers)----------#
    let l:i = HBUF_next(0)              " buffer index
    while l:i > 0
       "---(read the buffer)----------------#
@@ -603,13 +634,19 @@ function! HTAG_findloc(base_name, line_num)
       return
    endif
    silent exec('b! ' . l:buf_num)
+   "---(check for file name)---------------------#
+   "let l:target  = bufnr(a:base_name)
+   "if (l:target  < 1)
+   "   silent exec('b! ' . l:curr_buf)
+   "   return "[--] <<nobuf>>"
+   "endif
    "---(get full tag range for buffer)-----------#
    "> start of buffer entries
    normal gg
    let  l:start_line = search("^".a:base_name,"cW")
    if (l:start_line < 1)
       silent exec('b! ' . l:curr_buf)
-      return "[--] <<non-buffer>>"
+      return "[--] n/a       "
    endif
    silent! exec "normal mx"
    "> start of next buffer entriies
