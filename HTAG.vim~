@@ -20,6 +20,7 @@
 "
 "   this tool is meant to provide...
 "      - an inventory of all global symbols in active buffers
+"      - help organize tags into major groups for ease of use
 "      - to work with all major programming and scripting languages
 "      - quick, short-cut based navigation within a file/window
 "      - automatically show the current buffer's tags when switching
@@ -46,8 +47,8 @@
 
 
 "---(general)------------------------------------#
-let g:HTAG_title    = "HTAG_buffer"
-let g:HTAG_locked   = "n"
+let g:htag_title    = "HTAG_buffer"
+let g:htag_locked   = "n"
 let g:HTAG_times    = 0
 
 "---(current tag)--------------------------------#
@@ -66,84 +67,94 @@ let s:HTAG_ccurr    = 0
 
 
 
-"==============================================================================#
-"=======                        initialization                          =======#
-"==============================================================================#
+
+""=========================-------------------------==========================##
+""===----             standard initialization fuctions (6)             ----===##
+""=========================-------------------------==========================##
+""  ...._init        :: prepare script/window at vim startup
+""  ...._syntax      :: setup syntax rules
+""  ...._keys        :: setup key mappings
+""  ...._unkeys      :: remove key mappings
+""  ...._auto        :: setup auto commands
+""  ...._unauto      :: remove auto commands
+func! s:o___STD_INIT________o ()
+endf
 
 
-
-"===[ ROOT   ]===> main setup routine
-function! HTAG_init()
-   silent! exec 'vert split '.g:HTAG_title
-   setlocal modifiable
-   call HALL_start()
-   call HTAG_syntax()
-   call HTAG_keys()
-   setlocal nomodifiable
+""=[[ main setup driver ]]================================[ root   [ 113n0s ]=##
+func! HTAG_init ()
+   sil!  exec 'vert split '.g:htag_title
+   setl  modifiable
+   call  HALL_start  ()
+   call  HTAG_syntax ()
+   call  HTAG_keys   ()
+   setl  nomodifiable
    hide
-   "silent call HTAG_show()
-   return
-endfunction
+   retu  0
+endf
+
+
+""=[[ establish syntax highlighting ]]====================[ leaf   [ 210n0x ]=##
+func! HTAG_syntax ()
+   synt  clear
+   synt  match htag_file           '^[A-Za-z0-9_.-]\+[ ]\+FILE'
+   synt  match htag_major          '^[a-z].*[ ]([0-9]\+)$'
+   synt  match htag_context        '^  [a-z][a-z/][a-z] [=].*'
+   synt  match htag_detail         '^[a-z-][a-z-]  [a-zA-Z][a-zA-Z0-9_].*'
+   synt  match htag_tag            '^[a-z-][a-z-]  '   containedin=rsh_tag_detail
+   synt  match htag_separator      'o___[A-Z_].*___'   containedin=rsh_tab_detail
+   hi    htag_file      cterm=reverse,bold   ctermbg=none   ctermfg=5
+   hi    htag_major     cterm=bold,underline ctermbg=none   ctermfg=5
+   hi    htag_context   cterm=none           ctermbg=none   ctermfg=3
+   hi    htag_detail    cterm=none           ctermbg=none   ctermfg=0
+   hi    htag_tag       cterm=bold           ctermbg=none   ctermfg=4
+   hi    htag_separator cterm=none           ctermbg=none   ctermfg=7
+   retu  0
+endf
+
+
+""=[[ establish buffer specific key mapping ]]============[ leaf   [ 110n0x ]=##
+func! HTAG_keys ()
+   nmap           ,t  :call HTAG_show   ()<cr>
+   nnor           ;;  :call HTAG_hints  ()<cr>
+   nmap  <buffer> t   :call HTAG_update ()<cr>
+   nmap  <buffer> h   :call HTAG_hide   ()<cr>
+   retu
+endf
+
+
+""=[[ establish automatic updating strategy ]]============[ leaf   [ 110n0x ]=##
+funct! HTAG_auto_on ()
+   augr  HTAG
+      auto  HTAG      BufEnter      * call HTAG_change ()
+      auto  HTAG      BufRead       * call HTAG_change ()
+      auto  HTAG      BufNewFile    * call HTAG_change ()
+   augr  END
+   retu
+endf
+
+
+""=[[ tuwn off automatic updating strategy ]]=============[ leaf   [ 110n0x ]=##
+func! HTAG_auto_off ()
+   auto! HTAG
+   augr! HTAG
+   augr  END
+   retu
+endf
 
 
 
-"===[ LEAF   ]===> establish syntax highlighting
-function! HTAG_syntax()
-   syntax clear
-   syntax match htag_file           '^[A-Za-z0-9_.-]\+[ ]\+FILE'
-   syntax match htag_major          '^[a-z].*[ ]([0-9]\+)$'
-   syntax match htag_context        '^  [a-z][a-z/][a-z] [=].*'
-   syntax match htag_detail         '^[a-z][a-z]  [a-zA-Z][a-zA-Z0-9].*'
-   syntax match htag_tag            '^[a-z][a-z]  '  containedin=rsh_tag_detail
-   syntax match htag_separator      'o___[A-Z].*___' containedin=rsh_tab_detail
-   hi htag_file      cterm=reverse,bold   ctermbg=none   ctermfg=5
-   hi htag_major     cterm=bold,underline ctermbg=none   ctermfg=5
-   hi htag_context   cterm=none           ctermbg=none   ctermfg=3
-   hi htag_detail    cterm=none           ctermbg=none   ctermfg=0
-   hi htag_separator cterm=none           ctermbg=none   ctermfg=4
-   hi htag_tag       cterm=bold           ctermbg=none   ctermfg=4
-   return
-endfunction
 
+""=========================-------------------------==========================##
+""===----             standard window action fuctions (4)              ----===##
+""=========================-------------------------==========================##
+""  ...._on          :: display the window without entering it
+""  ...._show        :: enter the window
+""  ...._hide        :: take the window off the display
+""  ...._resize      :: change the width/height of the window
+func! s:o___STD_ACTIONS_____o ()
+endf
 
-
-"===[ LEAF   ]===> establish the buffer specific key mapping
-function! HTAG_keys()
-   nmap          ,t  :call HTAG_show()<cr>
-   nmap          ;;  :call HTAG_hints()<cr>
-   nmap <buffer> t   :call HTAG_update()<cr>
-   nmap <buffer> h   :call HTAG_hide()<cr>
-   return
-endfunction
-
-
-
-"===[ LEAF   ]===> establish automatic updating strategy
-function! HTAG_auto_on()
-   augroup HTAG
-      autocmd HTAG      BufEnter      * call HTAG_change()
-      autocmd HTAG      BufRead       * call HTAG_change()
-      "autocmd HTAG      BufWrite      * call HTAG_update()
-      autocmd HTAG      BufNewFile    * call HTAG_change()
-   augroup END
-   return
-endfunction
-
-
-
-"===[ LEAF   ]===> turn off automatic updating strategy
-function! HTAG_auto_off()
-   autocmd! HTAG
-   augroup! HTAG
-   augroup END
-   return
-endfunction
-
-
-
-"==============================================================================#
-"=======                           show/hide                            =======#
-"==============================================================================#
 
 "===[[ ROOT   ]]==> simplified interface for starting up vim from CLI w/"-c"
 function! HTAG_on()
@@ -152,45 +163,51 @@ function! HTAG_on()
 endfunction
 
 
-"===[ ROOT   ]===> main setup routine <==============================#
-function! HTAG_show()
-   "---(do not allow recursion)------------------#
-   if (g:HTAG_locked == "y")
-      return
-   endif
-   "---(save working win/buf/loc)----------------#
-   if (HBUF_save("HTAG_show()         :: ") < 1)
-      return
-   endif
-   "---(lock her down)---------------------------#
-   let  g:hbuf_locked = "y"
-   let  g:HTAG_locked = "y"
-   "---(verify the buffer)-----------------------#
-   let l:tag_buf         = bufnr(g:HTAG_title)
-   if (l:tag_buf < 1)
-      call HTAG_init()
-   endif
-   "---(close the existing window)---------------#
-   let l:tag_win = bufwinnr(l:tag_buf)
-   if (l:tag_win > 0)
-      silent exec l:tag_win.' wincmd w'
+""=[[ display the tag window ]]===========================[ twig   [ 433y6s ]=##
+func! HTAG_show ()
+   ""---(locals)-----------+-----------+-##
+   let   l:prefix    = "HTAG_show"
+   let   l:rce       = -10
+   ""---(defense : no recursion)---------##
+   let   l:rce -= 1
+   if    (g:htag_locked == "y")
+      call  HALL_message (l:prefix, "htag is locked", l:rce)
+      retu  l:rce
+   endi
+   ""---(save working win/buf/loc)-------##
+   let   l:rce -= 1
+   if    (HBUF_save ("HTAG_show()         :: ") < 1)
+      call  HALL_message (l:prefix, "can't save current buffer", l:rce)
+      retu  l:rce
+   endi
+   ""---(lock her down)------------------##
+   let   g:hbuf_locked = "y"
+   let   g:htag_locked = "y"
+   ""---(verify the buffer)--------------##
+   let   l:tag_buf = bufnr (g:htag_title)
+   if    (l:tag_buf < 1)
+      call  HTAG_init ()
+   endi
+   ""---(close the existing window)------##
+   let   l:tag_win = bufwinnr(l:tag_buf)
+   if    (l:tag_win > 0)
+      sil   exec l:tag_win.' wincmd w'
       hide
-   endif
-   "---(position it properly)--------------------#
-   silent! exec 'vert split '.g:HTAG_title
-   vert resize 20
-   "---(activate the repositioning)--------------#
-   call HTAG_auto_on()
-   "---(set it up)-------------------------------#
-   normal zt
-   "---(let her go)------------------------------#
-   let  g:hbuf_locked = "n"
-   let  g:HTAG_locked = "n"
-   "---(complete)--------------------------------#
-   echon "HTAG_show()           :: complete."
-   return
-endfunction
-
+   endi
+   ""---(position it properly)-----------##
+   sil!  exec 'vert split '.g:htag_title
+   vert  resize 20
+   ""---(activate the repositioning)-----##
+   call  HTAG_auto_on()
+   ""---(set it up)----------------------##
+   norm  zt
+   ""---(let her go)---------------------##
+   let   g:hbuf_locked = "n"
+   let   g:htag_locked = "n"
+   ""---(complete)-----------------------##
+   call  HALL_message (l:prefix, "complete.", 0)
+   retu  0
+endf
 
 
 "===[ LEAF   ]===> hide the window
@@ -208,6 +225,10 @@ endfunction
 "===----                              hints                             ----===#
 "==============================================================================#
 
+func! s:o___SPECIFIC________o()
+endf
+
+
 
 
 "===[ LEAF   ]===> get a two-char tag identifier from the user <===============#
@@ -215,13 +236,13 @@ function! HTAG_hint_input()
    echon   "enter tag text = "
    let    l:x_one = printf("%c", getchar())
    echon  l:x_one
-   if l:x_one < "a" || l:x_one > "z"
+   if (l:x_one < "a" || l:x_one > "z") && (l:x_one < "A" || l:x_one > "Z")
       echon "  (invalid character) user canceled..."
       return "--"
    endif
    let    l:x_two = printf("%c", getchar())
    echon  l:x_two
-   if l:x_two < "a" || l:x_two > "z"
+   if (l:x_two < "a" || l:x_two > "z") && (l:x_two < "A" || l:x_two > "Z")
       echon "  (invalid character) user canceled..."
       return "--"
    endif
@@ -245,18 +266,23 @@ function! HTAG_hints()       " PURPOSE : move to a specific hint/tag
       return -1
    endif
    "---(identify the handler)-----------------#
-   if l:tag_id >= "ma"
-      echon "  (cscope/grep tag) processing..."
+   if    tag_id >= "aa"
+      echon "  (normal ctag) processing..."
+   elsei tag_id >= "MA"
+      echon "  (HCSC/cscope/grep tag) processing..."
       call HCSC_hints(l:tag_id)
       return
+   elsei tag_id >= "AA"
+      echon "  (HFIX/quickfix tag) processing..."
+      call HFIX_hints(l:tag_id)
+      return
    endif
-   echon "  (normal ctag) processing..."
    "---(switch to tag window)-----------------#
-   let    l:win_num = HBUF_by_name(g:HTAG_title)
+   let    l:win_num = HBUF_by_name(g:htag_title)
    if (l:win_num != -1)
       silent exec l:win_num.' wincmd w'
    endif
-   silent exec   ":normal gg"
+   silent exec   ":norm  _"
    "---(find the tag)-------------------------#
    call   search("^" . l:tag_id . "  ","cW")
    if line(".") <= 1
@@ -286,7 +312,7 @@ function! HTAG_hints()       " PURPOSE : move to a specific hint/tag
       endif
    endif
    "---(get to the right line)----------------# make sure to show comments above
-   silent exec ":normal gg"
+   silent exec ":norm  _"
    "silent! exec ":normal ".(g:HTAG_line - 1). "j"
    silent! exec ":".g:HTAG_line
    if g:HTAG_type == "function"
@@ -305,32 +331,33 @@ endfunction
 
 
 
-"===[ PETAL  ]===> adjuct tag display when buffers change <====================#
+"===[ PETAL  ]===> adjust tag display when buffers change <====================#
 function! HTAG_change()
    "---(do not allow recursion)------------------#
-   if (g:HTAG_locked == "y")
-      return
-   endif
+   if    (g:htag_locked == "y")
+      retu
+   endi
    "---(save working win/buf/loc)----------------#
    if (HBUF_save("HTAG_change()       :: ") < 1)
       return
    endif
    "---(find the tags window)--------------------#
-   if (HBUF_by_name(g:HTAG_title) < 1)
+   if (HBUF_by_name(g:htag_title) < 1)
       return
    endif
    "---(lock her down)---------------------------#
    let  g:hbuf_locked = "y"
-   let  g:HTAG_locked = "y"
+   let  g:htag_locked = "y"
    silent! exec l:tag_win.' wincmd w'
    "---(go to the right place)-------------------"
-   normal gg
+   norm  _
    call search("^".g:hbuf_pname."[ ].*FILE$","cW")
+   silent exec "normal zt"
    silent exec "normal zt"
    "---(go back to working win/buf/loc)----------#
    call HBUF_restore()
    "---(let her go)------------------------------#
-   let  g:HTAG_locked = "n"
+   let  g:htag_locked = "n"
    let  g:hbuf_locked = "n"
    "---(complete)--------------------------------#
    return
@@ -341,98 +368,191 @@ endfunction
 "===[ PETAL  ]===> create tag list for all active buffers <====================#
 function! HTAG_update()
    "---(do not allow recursion)------------------#
-   if (g:HTAG_locked == "y")
-      return
+   if (g:htag_locked == "y")
+      retu
    endif
    "---(start locked code)-----------------------#
    let  g:hbuf_locked = "y"
-   let  g:HTAG_locked = "y"
+   let  g:htag_locked = "y"
    "---(run)-------------------------------------#
    let  g:HTAG_times  += 1
-   call HTAG_list()
+   call HTAG_list_BUFSONLY()
    "---(unlock code)-----------------------------#
-   let  g:HTAG_locked = "n"
+   let  g:htag_locked = "n"
    let  g:hbuf_locked = "n"
    "---(return to previous window)---------------#
    call HBUF_restore()
    "---(complete)--------------------------------#
-   echon "HTAG_update()      :: complete.  arstinar"
+   echon "HTAG_update()      :: complete."
    return
 endfunction
 
 
-
-"===[ BRANCH ]===> create tag list for all active buffers <====================#
-function! HTAG_list()
-   ""---(prepare locals)-------------------------#
-   let l:g_hint_major = 1
-   let l:g_hint_minor = 0
+""=[ branch ]=== create tag list for all active buffers ===========[ 433y6s ]=##
+func! HTAG_list_BUFSONLY ()
+   ""---(prepare locals)-----------------##
+   let    l:g_hint_major = 1
+   let    l:g_hint_minor = 0
+   let    l:g_total      = 0
+   let    l:g_empty      = 0
+   let    l:g_comment    = 0
+   let    l:g_debugging  = 0
+   let    l:g_code       = 0
+   let    l:g_slocl      = 0
    ""---(clear out existing contents)------------#
-   setlocal modifiable
-   silent exec ":1,$delete"
-   setlocal nomodifiable
-   "---(loop through the valid buffers)----------#
-   setlocal modifiable
-   "---(run the tags)----------------#
-   silent! exec "$:!ctags -x --sort=no --c-kinds=cdefgnpstuvx --c++-kinds=cdefgnpstuvx --file-scope=yes *"
-   "---(go back and awk them)--------#
-   silent! exec ":silent! 0,$!rsh_tag.awk 'g_hint_major=".l:g_hint_major."' 'g_hint_minor=".l:g_hint_minor."'"
-   "---(collect the 'last tag')------#
-   normal GG
-   let l:g_hint_minor = getline('.')
-   normal Dk
-   let l:g_hint_major = getline('.')
-   normal D
-   setlocal nomodifiable
-   "---(go back and awk them)--------#
-   "silent! normal 'x
-   "call HTAG_func_syn(l:base_name)
-   normal gg
-   return
-endfunction
-
-
-
-"===[ BRANCH ]===> create tag list for all active buffers <====================#
-function! HTAG_list_BUFSONLY()
-   ""---(prepare locals)-------------------------#
-   let l:g_hint_major = 1
-   let l:g_hint_minor = 0
+   setl   modifiable
+   sil    exec ":1,$delete"
+   setl   nomodifiable
+   "---(get the totals)--------------------------#
+   let    l:i = HBUF_next (0)              " buffer index
+   while  (l:i > 0)
+      ""---(clear it out)----------------##
+      setl  modifiable
+      sil   exec ":1,$delete"
+      ""---(get the file name)-----------##
+      let   l:full_name = bufname (l:i)
+      let   l:base_loc  = match   (l:full_name, "[A-Za-z0-9_.]*$")
+      let   l:base_name = strpart (l:full_name, l:base_loc)
+      let   l:ext_loc   = match   (l:full_name, "[.][A-Za-z0-9_]*$")
+      let   l:ext_name  = strpart (l:full_name, l:ext_loc)
+      ""---(collect data)----------------##
+      sil!  exec   ".:!cat ".l:full_name." | wc -l"
+      let   total  =getline('.')
+      sil!  exec   ".:!grep \"^[ ]*$\" ".l:full_name." | wc -l"
+      let   empty  =getline('.')
+      "---(grand totals)----------------#
+      let   g_total     += total
+      let   g_empty     += empty
+      ""---(skip non-c files)------------##
+      if (l:ext_name != ".c" && l:ext_name != ".h")
+         setl  nomodifiable
+         let l:i = HBUF_next(l:i)            " buffer index
+         continue
+      endi
+      ""---(collect data)----------------##
+      sil!  exec   ".:!grep \"^[ ]*[\/][*]\" ".l:full_name." | wc -l"
+      let   comm1  =getline('.')
+      sil!  exec   ".:!grep \"^[ ]*[*]\" ".l:full_name." | wc -l"
+      let   comm2  =getline('.')
+      sil!  exec   ".:!grep \"^[ ]*DEBUG_\" ".l:full_name." | wc -l"
+      let   debug  =getline('.')
+      sil!  exec   ".:!grep \"^[ ]*DEBUG_.*yLOG_\" ".l:full_name." | wc -l"
+      let   dlogs  =getline('.')
+      sil!  exec   ".:!grep \"yLOG_\" ".l:full_name." | wc -l"
+      let   ylogs  =getline('.')
+      sil!  exec   ".:!grep \";\" ".l:full_name." | wc -l"
+      let   slocl  =getline('.')
+      ""---(calculate stats)-------------##
+      let   debugging    = dlogs + (ylogs - dlogs) + (debug - dlogs)
+      let   code         = total - empty - comm1 - comm2 - debugging
+      let   slocl       -= debugging
+      "---(grand totals)----------------#
+      let   g_comment   += (comm1 + comm2)
+      let   g_debugging += debugging
+      let   g_code      += code
+      let   g_slocl     += slocl
+      "---(next)------------------------#
+      let   l:i = HBUF_next(l:i)            " buffer index
+   endwhile
    ""---(clear out existing contents)------------#
-   setlocal modifiable
-   silent exec ":1,$delete"
-   setlocal nomodifiable
+   setl   modifiable
+   sil    exec ":1,$delete"
+   setl   nomodifiable
    "---(loop through the valid buffers)----------#
-   let l:i = HBUF_next(0)              " buffer index
-   while l:i > 0
-      "---(read the buffer)----------------#
-      let l:full_name = bufname(l:i)
-      let l:base_loc  = match(l:full_name,"[A-Za-z0-9_.]*$")
-      let l:base_name = strpart(l:full_name,l:base_loc)
-      "echon "HTAG_list()           :: processing ".l:base_name."..."
-      "---(mark the bottom tags)--------#
-      "argh
-      setlocal modifiable
-      normal GG
-      silent! normal mx
-      "---(run the tags)----------------#
-      silent! exec "$:!ctags -x --sort=no --c-kinds=cdefgnpstuvx --c++-kinds=cdefgnpstuvx --file-scope=yes ".l:full_name
+   let    l:i = HBUF_next (0)              " buffer index
+   while  (l:i > 0)
+      ""---(get the file name)-----------##
+      let   l:full_name = bufname (l:i)
+      let   l:base_loc  = match   (l:full_name, "[A-Za-z0-9_.]*$")
+      let   l:base_name = strpart (l:full_name, l:base_loc)
+      let   l:ext_loc   = match   (l:full_name, "[.][A-Za-z0-9_]*$")
+      let   l:ext_name  = strpart (l:full_name, l:ext_loc)
+      ""---(message to console)----------##
+      echon "HTAG_list()           :: processing ".l:base_name."..."
+      ""---(mark the start of new file)--##
+      setl  modifiable
+      norm  GG
+      sil!  normal mx
+      ""---(run the tags)----------------##
+      ""sil!  exec "$:!ctags -x --sort=no --c-kinds=cdefgnpstuvx --c++-kinds=cdefgnpstuvx --file-scope=yes ".l:full_name
+      sil!  exec "$:!ctags -x --sort=no --file-scope=yes ".l:full_name
       "---(go back and awk them)--------#
-      silent! normal 'x
-      silent! exec ":silent! .,$!rsh_tag.awk 'g_hint_major=".l:g_hint_major."' 'g_hint_minor=".l:g_hint_minor."' 'g_file_name=".l:base_name."'"
+      sil!  normal 'x
+      sil!  exec ":silent! .,$!HTAG.awk 'g_hint_major=".l:g_hint_major."' 'g_hint_minor=".l:g_hint_minor."' 'g_file_name=".l:base_name."'"
+      ""---(count total lines)-----------##
+      sil!  normal 'x
+      "sil!  exec   "norm dddd"
+      sil!  exec   "norm o"
+      sil!  exec   ".:!cat ".l:full_name." | wc -l"
+      let   total=getline('.')
+      sil!  exec   "norm ddk"
+      sil!  exec   "norm olines :".printf ("%5d %6d", total, g_total)
+      ""---(count blank lines)-----------##
+      sil!  exec   "norm o"
+      sil!  exec   ".:!grep \"^[ ]*$\" ".l:full_name." | wc -l"
+      let   empty=getline('.')
+      sil!  exec   "norm ddk"
+      sil!  exec   "norm oempty :".printf ("%5d %6d", empty, g_empty)
+      ""---(skip non-c files)------------##
+      if (l:ext_name != ".c" && l:ext_name != ".h")
+         sil!  exec   "norm odocs  :  --- ".printf ("%6d", g_comment)
+         sil!  exec   "norm odebug :  --- ".printf ("%6d", g_debugging)
+         sil!  exec   "norm ocode  :  --- ".printf ("%6d", g_code)
+         sil!  exec   "norm oslocl :  --- ".printf ("%6d", g_slocl)
+         setl  nomodifiable
+         let l:i = HBUF_next(l:i)            " buffer index
+         continue
+      endi
+      ""---(count c-comment begin)-------##
+      sil!  exec   "norm o"
+      sil!  exec   ".:!grep \"^[ ]*[\/][*]\" ".l:full_name." | wc -l"
+      let   comm1=getline('.')
+      sil!  exec   "norm ddk"
+      ""---(count c-comment continue)----##
+      sil!  exec   "norm o"
+      sil!  exec   ".:!grep \"^[ ]*[*]\" ".l:full_name." | wc -l"
+      let   comm2=getline('.')
+      sil!  exec   "norm ddk"
+      ""---(write total comments)--------##
+      sil!  exec   "norm odocs  :".printf ("%5d %6d", comm1 + comm2, g_comment)
+      ""---(count debug lines)-----------##
+      sil!  exec   "norm o"
+      sil!  exec   ".:!grep \"^[ ]*DEBUG_\" ".l:full_name." | wc -l"
+      let   debug=getline('.')
+      sil!  exec   "norm ddk"
+      ""---(count log lines)-------------##
+      sil!  exec   "norm o"
+      sil!  exec   ".:!grep \"^[ ]*DEBUG_.*yLOG_\" ".l:full_name." | wc -l"
+      let   dlogs=getline('.')
+      sil!  exec   "norm ddk"
+      ""---(count log lines)-------------##
+      sil!  exec   "norm o"
+      sil!  exec   ".:!grep \"yLOG_\" ".l:full_name." | wc -l"
+      let   ylogs=getline('.')
+      sil!  exec   "norm ddk"
+      let   l:debugging= (dlogs + (ylogs - dlogs) + (debug - dlogs))
+      sil!  exec   "norm odebug :".printf ("%5d %6d", debugging, g_debugging)
+      ""---(write code total)------------##
+      sil!  exec   "norm ocode  :".printf ("%5d %6d", ( total - empty - comm1 - comm2 - debugging), g_code)
+      ""---(write sloc total)------------##
+      sil!  exec   "norm o"
+      sil!  exec   ".:!grep \";\" ".l:full_name." | wc -l"
+      let   slocl=getline('.')
+      sil!  exec   "norm ddk"
+      sil!  exec   "norm oslocl :".printf ("%5d %6d", slocl + debugging, g_slocl)
       "---(collect the 'last tag')------#
-      normal GG
-      let l:g_hint_minor = getline('.')
-      normal Dk
-      let l:g_hint_major = getline('.')
-      normal D
-      setlocal nomodifiable
+      norm  GG
+      let   l:g_hint_minor = getline('.')
+      norm  Dk
+      let   l:g_hint_major = getline('.')
+      norm  D
+      setl  nomodifiable
       "---(go back and awk them)--------#
       "silent! normal 'x
       "call HTAG_func_syn(l:base_name)
       let l:i = HBUF_next(l:i)            " buffer index
    endwhile
-   normal gg
+   norm  _
    return
 endfunction
 
@@ -534,7 +654,7 @@ endfunction
 
 function! HTAG_head(file, type)
    "---(do not allow recursion)------------------#
-   if (g:HTAG_locked == "y")
+   if (g:htag_locked == "y")
       return -2
    endif
    "---(save working win/buf/loc)----------------#
@@ -544,12 +664,12 @@ function! HTAG_head(file, type)
    "---(make sure tags are updated)--------------#
    normal ,tt
    "---(check for the window)--------------------#
-   if (HBUF_by_name(g:HTAG_title) < 1)
+   if (HBUF_by_name(g:htag_title) < 1)
       echon "HTAG_head()         :: tag window not showing..."
       return -2
    endif
    "---(get full tag range for buffer)-----------#
-   normal gg
+   norm  _
    let  l:start_line = search("^".a:file,"cW")
    if (l:start_line < 1)
       echon "HTAG_head()         :: could not file file entry for ".a:file." FATAL"
@@ -594,64 +714,59 @@ function! HTAG_curr()
 endfunction
 
 
-
-function! HTAG_next()
+"==[[ create tag list for all active buffers ]]====================[ 433y6s ]==#
+func! HTAG_next ()
    "---(do not allow recursion)------------------#
-   if (g:HTAG_locked == "y")
-      return -2
-   endif
+   if    (g:htag_locked == "y")
+      retu  -2
+   endi
    "---(verify position in range)----------------#
-   if (g:HTAG_ccurr >= g:HTAG_ccount)
-      return -1
-   endif
+   if    (g:HTAG_ccurr >= g:HTAG_ccount)
+      retu  -1
+   endi
    "---(save working win/buf/loc)----------------#
-   if (HBUF_save("HTAG_head()         :: ") < 1)
-      return -2
-   endif
+   if    (HBUF_save("HTAG_head()         :: ") < 1)
+      retu  -2
+   endi
    "---(check for the window)--------------------#
-   if (HBUF_by_name(g:HTAG_title) < 1)
+   if    (HBUF_by_name(g:htag_title) < 1)
       echon "HTAG_head()         :: tag window not showing..."
-      return -2
-   endif
+      retu  -2
+   endi
    "---(get full tag range for buffer)-----------#
-   let  g:HTAG_ccurr += 1
-   normal gg
-   exec "normal ".g:HTAG_chead."G"
-   exec "normal ".g:HTAG_ccurr."j"
-   call HTAG_parse()
+   let   g:HTAG_ccurr += 1
+   norm  _
+   exec  "normal ".g:HTAG_chead."G"
+   exec  "normal ".g:HTAG_ccurr."j"
+   call  HTAG_parse()
    "---(complete)--------------------------------#
-   call HBUF_restore()
-   return g:HTAG_chead
-endfunction
+   call  HBUF_restore()
+   retu  g:HTAG_chead
+endf
 
 
 
 function! HTAG_findloc(base_name, line_num)
-   let l:curr_buf    = bufnr('%')     " get the current_buf
-   "---(check for the buffer)--------------------#
-   let l:buf_num = bufnr(g:HTAG_title)
-   if (l:buf_num < 1)
-      return
-   endif
-   silent exec('b! ' . l:buf_num)
-   "---(check for file name)---------------------#
-   "let l:target  = bufnr(a:base_name)
-   "if (l:target  < 1)
-   "   silent exec('b! ' . l:curr_buf)
-   "   return "[--] <<nobuf>>"
-   "endif
+   "echo "was curnum=".bufnr("%").", which is <<".bufname("%").">>"
+   let   rc = HBUF_by_name(g:htag_title)
+   if    rc < 1
+      return "[--] <<no tags>>"
+   endi
+   "echo "now curnum=".bufnr("%").", which is <<".bufname("%").">>"
    "---(get full tag range for buffer)-----------#
    "> start of buffer entries
-   normal gg
+   norm  _
+   "echo "<<".a:base_name.">>"
    let  l:start_line = search("^".a:base_name,"cW")
+   "echo start_line
    if (l:start_line < 1)
-      silent exec('b! ' . l:curr_buf)
       return "[--] n/a       "
    endif
    silent! exec "normal mx"
    "> start of next buffer entriies
    normal j
    let l:stop_line  = search("   FILE$", "W") - 1
+   "echo stop_line
    if l:stop_line == -1
       normal GG
       let  l:stop_line    = line('.')
@@ -662,7 +777,6 @@ function! HTAG_findloc(base_name, line_num)
    silent! exec "normal mx"
    if l:curr_line == 0
       "echon "HTAG_findloc()        :: no functions in file ".a:base_name."..."
-      silent exec('b! ' . l:curr_buf)
       return "[--] <<global>>"
    endif
    let  l:full_line    = getline('.')
@@ -684,7 +798,7 @@ function! HTAG_findloc(base_name, line_num)
       let  l:curr = l:curr + 1
    endwhile
    "---(complete)--------------------------------#
-   silent exec('b! ' . l:curr_buf)
+   "echo "done"
    return l:rtag_final
 endfunction
 

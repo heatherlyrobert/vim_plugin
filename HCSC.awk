@@ -41,19 +41,19 @@ BEGIN {
 END {
    printf("%s found %5d matches\n", g_option, g_count);
    for (x = 1; x <= g_count; x++) {
-      if (g_hmajor > 0 && g_hmajor < 16) {
+      if (g_hmajor >= 13 && g_hmajor <= 26) {
          ++g_hminor;
          if (g_hminor > 26) {
             ++g_hmajor;
             g_hminor = 1;
          }
       }
-      if (g_hmajor >= 15) {
-         g_hmajor = 45 - 96;
-         g_hminor = 45 - 96;
+      if (g_hmajor > 26) {
+         g_hmajor = 45 - 64;
+         g_hminor = 45 - 64;
       }
       printf("%c%c  %1d %-18.18s [--] %20.20s : %4d : %-100.100s ::: %s\n",
-             g_hmajor + 96, g_hminor + 96, 0,
+             g_hmajor + 64, g_hminor + 64, 0,
              g_entry[x, 1], " ", g_entry[x, 2], g_entry[x, 3], g_entry[x, 4]);
    }
    printf("end of matches %100.100s\n", " ");

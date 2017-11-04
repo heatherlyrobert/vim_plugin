@@ -23,42 +23,60 @@
 
 
 
-function! HALL_start()
+func!  HALL_start()
+   setlo  modifiable
    "---(structural addributes)-------------------#
-   setlocal noswapfile
-   setlocal buftype=nofile
-   setlocal filetype=nofile
-   setlocal nobuflisted
-   setlocal bufhidden=hide
+   setlo  noswapfile
+   setlo  buftype=nofile
+   setlo  filetype=nofile
+   setlo  nobuflisted
+   setlo  bufhidden=hide
    "---(cosmetic attributes)---------------------#
-   setlocal winfixwidth
-   setlocal nowrap
-   setlocal textwidth=1000
-   setlocal foldcolumn=0
-   setlocal nonumber
-   setlocal nocursorcolumn
-   setlocal nocursorline
+   setlo  winfixwidth
+   setlo  nowrap
+   setlo  textwidth=1000
+   setlo  foldcolumn=0
+   setlo  nonumber
+   setlo  nocursorcolumn
+   setlo  nocursorline
    "---(complete)--------------------------------#
-   return
-endfunction
+   setlo  nomodifiable
+   retu
+endf
 
 
 
-function! HALL_lock()
-   let  g:hbuf_locked      = "y"
-   let  g:HTAG_locked      = "y"
-   let  g:hcsc_locked      = "y"
-   let  g:RSH_FIX_locked   = "y"
-   return
-endfunction
+func!  HALL_lock()
+   let   g:hbuf_locked      = "y"
+   let   g:hcsc_locked      = "y"
+   let   g:hfix_locked      = "y"
+   let   g:htag_locked      = "y"
+   retu
+endf
 
 
 
-function! HALL_unlock()
-   let  g:hbuf_locked      = "n"
-   let  g:HTAG_locked      = "n"
-   let  g:hcsc_locked      = "n"
-   let  g:RSH_FIX_locked   = "n"
-   return
-endfunction
+func!  HALL_unlock()
+   let   g:hbuf_locked      = "n"
+   let   g:hcsc_locked      = "n"
+   let   g:hfix_locked      = "n"
+   let   g:htag_locked      = "n"
+   retu
+endf
+
+
+"==[ leaf   ]==[[ display a simple statls message ]]===============[ 110n0m ]==#
+func! HALL_message (prefix, message, rc)
+   if    (a:rc ==  0)
+      let   l:status="(good)"
+   elsei (a:rc >   0)
+      let   l:status=printf("(warning , rc=%d)", a:rc)
+   elsei (a:rc < -10)
+      let   l:status=printf("(ABORTED , rc=%d)", a:rc)
+   elsei (a:rc <   0)
+      let   l:status=printf("(SKIPPING, rc=%d)", a:rc)
+   endi
+   echon printf ("%-12.12s :: %s %s", a:prefix, a:message, l:status)
+   retu  0
+endf
 

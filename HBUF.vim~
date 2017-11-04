@@ -33,14 +33,14 @@
 "   is cleared
 "
 "   the cleanist solution for large scale editing appears to be...
-"      - have multiple editor sessions running, each focused on a single thing
-"      - within each session, group related code -- like source and header
-"      - if files don't share symbols, keep them separate (like makefiles)
+"      - have multiple editor sessions running, each with a specific application
+"      - within each session, group related code
+"      - if files don't share symbols, keep them separate
 "
 "   HBUF focuses on quick navigation as that is the most common use...
 "      - plan on typical editing of two to four primary files
 "      - maximum speed and efficiency appoach
-"      - see all buffers on a single, unobtrusive line
+"      - see all buffers on a single, unobtrusive line (or as few as can be)
 "      - have an optional taller view if more filer are edited
 "      - autoload the buffer window and show it up front
 "      - be able to toggle on/off to save screen real-estate
@@ -73,9 +73,10 @@ let g:hbuf_locked   = "n"                        " y/n hands off flag
 let g:hbuf_times    = 0                          " great debug/perf monitor
 
 let g:hbuf_pbuf     = 0    " current programming buffer number
-let g:hbuf_pname    = 0    " current programming buffer name
+let g:hbuf_pname    = ""   " current programming buffer name
 let g:hbuf_pline    = 0    " current programming buffer line
 let g:hbuf_pcol     = 0    " current programming buffer column
+let s:hbuf_size     = 1    " window height
 
 
 
@@ -88,81 +89,116 @@ let g:hbuf_pcol     = 0    " current programming buffer column
 command! -nargs=0  HBUFshow     call HBUF_show()
 
 
-"==============================================================================#
-"=======                        initialization                          =======#
-"==============================================================================#
+
+""=========================-------------------------==========================##
+""===----             standard initialization fuctions (6)             ----===##
+""=========================-------------------------==========================##
+""  ...._init        :: prepare script/window at vim startup
+""  ...._syntax      :: setup syntax rules
+""  ...._keys        :: setup key mappings
+""  ...._unkeys      :: remove key mappings
+""  ...._auto        :: setup auto commands
+""  ...._unauto      :: remove auto commands
+func! s:o___STD_INIT________o()
+endf
 
 
-
-"===[ ROOT   ]===> main setup routine
-function! HBUF_init()
-   silent! exec 'topleft split ' . g:hbuf_title
-   setlocal modifiable
-   call HALL_start()
-   call HBUF_syntax()
-   call HBUF_keys()
-   setlocal nomodifiable
+func! s:HBUF_init()
+   sil!  exec 'topleft split ' . g:hbuf_title
+   call  HALL_start()
+   call  s:HBUF_syntax()
+   call  s:HBUF_keys()
    hide
-   "silent! call HBUF_toggle()
-   return
-endfunction
+   retu
+endf
 
 
-
-"===[ LEAF   ]===> establish syntax highlighting
-function! HBUF_syntax()
-   syntax clear
-   syntax match hbuf_count     '^[0-9][0-9]'
-   syntax match hbuf_visible   '[0-9][>][A-Za-z0-9\._-]\+ '
-   syntax match hbuf_changed   '[0-9][)][A-Za-z0-9\._-]\+ '
-   syntax match hbuf_hidden    '[0-9]\][A-Za-z0-9\._-]\+ '
-   syntax match hbuf_id        '[0-9][)>\]]' contained
+funct! s:HBUF_syntax()
+   setlo modifiable
+   syn   clear
+   syn   match hbuf_cont      '>>'
+   syn   match hbuf_visible   '[0-9A-F][>][A-Za-z0-9\._-]\+ '
+   syn   match hbuf_changed   '[0-9A-F][)][A-Za-z0-9\._-]\+ '
+   syn   match hbuf_hidden    '[0-9A-F]\][A-Za-z0-9\._-]\+ '
+   syn   match hbuf_id        '[0-9A-F][)>\]]' contained
             \ containedin=hbuf_visible,hbuf_hidden,hbuf_changed
-   syntax match hbuf_timess    '[#][0-9]\+$'
-   hi hbuf_count  cterm=reverse,bold ctermbg=none ctermfg=5
-   hi link hbuf_visible    function
-   hi link hbuf_hidden     comment
-   hi link hbuf_changed    string
-   hi link hbuf_id         linenr
-   hi hbuf_timess  cterm=reverse,bold ctermbg=none ctermfg=4
-   return
-endfunction
+   syn   match hbuf_timess    '[#][0-9]\+$'
+   high  hbuf_cont   cterm=bold ctermbg=none ctermfg=5
+   high  link hbuf_visible    function
+   high  link hbuf_hidden     comment
+   high  link hbuf_changed    string
+   high  link hbuf_id         linenr
+   high  hbuf_timess  cterm=reverse,bold ctermbg=none ctermfg=4
+   setlo nomodifiable
+   retu
+endf
+
+
+func! s:HBUF_keys()
+   setlo modifiable
+   "---(specific)------------------------------------#
+   nmap            ,a      :silent! exec "3 wincmd w"<cr>
+   nmap            ,b      :call HBUF_show()<cr>
+   nmap  <buffer>   b      :call HBUF_update()<cr>
+   "---(presentation/size)---------------------------#
+   nmap  <buffer>   -      :call HBUF_resize("-")<cr>
+   nmap  <buffer>   +      :call HBUF_resize("+")<cr>
+   nmap  <buffer>   h      :call HBUF_hide()<cr>
+   "---(complete)------------------------------------#
+   setlo nomodifiable
+   retu
+endf
+
+
+func! s:HBUF_unkeys()
+   setlo modifiable
+   nunm  <buffer>   b
+   nunm  <buffer>   -
+   nunm  <buffer>   +
+   nunm  <buffer>   h
+   setlo nomodifiable
+   retu
+endf
+
+
+func! s:HBUF_auto()
+   setlo modifiable
+   augr  HBUF
+      auto  HBUF      BufWinEnter   * call HBUF_update()
+      auto  HBUF      BufWinLeave   * call HBUF_update()
+   augr  END
+   setlo nomodifiable
+   retu
+endf
+
+
+func! s:HBUF_unauto()
+   setlo modifiable
+   auto! HBUF
+   augr! HBUF
+   augr  END
+   setlo nomodifiable
+   retu
+endf
 
 
 
-"===[ LEAF   ]===> establish the buffer specific key mapping
-function! HBUF_keys()
-   nmap  ,0          :call HBUF_toggle()<cr>
-   nmap  ,a          :silent! exec "3 wincmd w"<cr>
-   nmap  ,b          :silent! exec "4 wincmd w"<cr>
-   nmap <buffer> 0   :call HBUF_update()<cr>
-   nmap <buffer> h   :call HBUF_hide()<cr>
-   return
-endfunction
+""=========================-------------------------==========================##
+""===----             standard window action fuctions (4)              ----===##
+""=========================-------------------------==========================##
+""  ...._on          :: display the window without entering it
+""  ...._show        :: enter the window
+""  ...._hide        :: take the window off the display
+""  ...._resize      :: change the width/height of the window
+func! s:o___STD_ACTIONS_____o()
+endf
 
 
+func! HBUF_on()
+   call  HBUF_show()
+   call  HBUF_update()
+endf
 
-"===[ LEAF   ]===> establish automatic updating strategy
-function! HBUF_auto_on()
-   augroup HBUF
-      autocmd HBUF      BufWinEnter   * call HBUF_update()
-      autocmd HBUF      BufWinLeave   * call HBUF_update()
-   augroup END
-   return
-endfunction
-
-
-
-"===[ LEAF   ]===> turn off automatic updating strategy
-function! HBUF_auto_off()
-   autocmd! HBUF
-   augroup! HBUF
-   augroup END
-   return
-endfunction
-
-
-""===[[ START/STOP ]]==========================================================#
 
 function! HBUF_show()
    "---(do not allow recursion)------------------#
@@ -175,123 +211,117 @@ function! HBUF_show()
    endif
    "---(lock her down)---------------------------#
    call HALL_lock()
-   "---(check for the window)--------------------#
-   if (HBUF_by_name(g:hbuf_title) > 0)
+   "---(verify the buffer)-----------------------#
+   let buf_num         = bufnr(g:hbuf_title)
+   if (buf_num < 1)
+      call s:HBUF_init()
+   endif
+   "---(close the existing window)---------------#
+   let buf_win = bufwinnr(buf_num)
+   if (buf_win > 0)
+      silent exec buf_win.' wincmd w'
       hide
    endif
+   "---(check for the window)--------------------#
+   "if (HBUF_by_name(g:hbuf_title) > 0)
+   "   hide
+   "endif
    "---(open the buffer window)------------------#
-   silent! exec 'topleft split ' . g:hbuf_title
-   resize 1
-   "---(return to last window)-------------------#
-   wincmd p
+   sil!  exec  'topleft split ' . g:hbuf_title
+   call  HBUF_resize("0")
    "---(create the autocommands)-----------------#
-   call HBUF_auto_on()
+   call s:HBUF_auto()
    "---(update)----------------------------------#
-   call HBUF_restore()
+   "call HBUF_restore()
    call HALL_unlock()
-   call HBUF_update()
+   "call HBUF_update()
    "---(complete)--------------------------------#
+   echon "HBUF_show()        :: complete."
    return
 endfunction
 
 
-
-function! HBUF_hide()
-   "---(do not allow recursion)------------------#
-   if (g:hbuf_locked == "y")
-      return
-   endif
-   "---(save working win/buf/loc)----------------#
-   if (HBUF_save("HBUF_hide()         :: ") < 1)
-      return
-   endif
-   "---(lock her down)---------------------------#
-   call HALL_lock()
-   "---(check for the buffer)--------------------#
-   let l:buf_num = bufnr(g:hbuf_title)
-   if (l:buf_num < 1)
-      return
-   endif
-   "---(check for the window)--------------------#
-   let l:win_num = bufwinnr(l:buf_num)
-   if (l:win_num < 1)
-      return
-   endif
-   "---(kill the autocommands)-------------------#
-   call HBUF_auto_off()
-   "---(close the window)------------------------#
-   silent! exec l:win_num.' wincmd w'
+func! HBUF_hide()
+   ""---(defense)--------------------------------#
+   if    (bufname("%") != g:hbuf_title)
+      retu  -1
+   endi
+   ""---(process)--------------------------------#
+   call  s:HBUF_unauto()
    hide
-   "---(put it all back)-------------------------#
-   call HBUF_restore()
-   call HALL_unlock()
-   "---(complete)--------------------------------#
+   call  HBUF_restore()
+   ""---(complete)-------------------------------#
+   retu
+endf
+
+
+"" PURPOSE : update window size
+func! HBUF_resize(height)
+   ""---(get current state)----------------------#
+   "let   s:hbuf_size  = winheight(0)
+   ""---(process change)-------------------------#
+   if    (a:height == "+")
+      let   s:hbuf_size += 1
+   elsei (a:height == "-")
+      let   s:hbuf_size -= 1
+   elsei (a:height == "0")
+      let   s:hbuf_size  = 1
+   endi
+   ""---(test size values)-----------------------#
+   if    (s:hbuf_size > 3)
+      let   s:hbuf_size = 3 
+   elsei (s:hbuf_size < 1)
+      let   s:hbuf_size = 1
+   endi
+   ""---(resize)---------------------------------#
+   sil!  exec  "resize ".s:hbuf_size
+   ""---(complete)-------------------------------#
    return
-endfunction
-
-
-
-function! HBUF_toggle()
-   "---(check for the buffer)--------------------#
-   let l:buf_num = bufnr(g:hbuf_title)
-   if (l:buf_num < 1)
-      call HBUF_init()
-      return
-   endif
-   "---(check for the window)--------------------#
-   let l:win_num = bufwinnr(l:buf_num)
-   if (l:win_num > 0)
-      call HBUF_hide()
-   else
-      call HBUF_show()
-   endif
-   "---(complete)--------------------------------#
-   return
-endfunction
+endf
 
 
 
 ""===[[ SPECIALITY ]]==========================================================#
 
 
-
-
+func! s:o___SPECIFIC________o()
+endf
 
 
 function! HBUF_goto(buf_name)
    let l:buf_num = bufnr(a:buf_name)
    "---(check on the destination)----------------#
    if(l:buf_num < 1)
-      echon "HBUF_goto()      :: buffer <<".a:buf_name.">> does not exist..."
+      echon "HBUF_goto()        :: buffer <<".a:buf_name.">> does not exist..."
       return -1
    endif
    if (getbufvar(l:buf_num, '&buflisted') == 0)
-      echon "HBUF_goto()      :: buffer <<".a:buf_name.">> is not listed..."
+      echon "HBUF_goto()        :: buffer <<".a:buf_name.">> is not listed..."
       return 0
    endif
    "---(basic validity checks)-------------------#
    let l:buf_cur = bufnr('%')
    if (getbufvar(l:buf_cur, '&modifiable') == 0)
-      echon "HBUF_goto()      :: can not load a new buffer in specialty window..."
+      echon "HBUF_goto()        :: can not load a new buffer in specialty window..."
       return
    endif
    if (getbufvar(l:buf_cur, '&buflisted') == 0)
-      echon "HBUF_goto()      :: can not load a new buffer in specialty window..."
+      echon "HBUF_goto()        :: can not load a new buffer in specialty window..."
       return
    endif
    "---(don't reshow a buffer)-------------------#
-   let l:buf_num = bufnr(a:buf_name)
-   if  l:buf_num == l:buf_cur
-      echon "HBUF_goto()      :: buffer (".l:buf_num.") already loaded in this window..."
+   let   buf_num = bufnr(a:buf_name)
+   if    buf_num == buf_cur
+      echon "HBUF_goto()        :: buffer (".l:buf_num.") already loaded in this window..."
       return
    endif
    if(l:buf_num < 1)
-      echon "HBUF_goto()      :: buffer number less that 1, can not load..."
+      echon "HBUF_goto()        :: buffer number less that 1, can not load..."
       return
    endif
    "---(show it)---------------------------------#
    silent! exec('b! ' . l:buf_num)
-   echon "HBUF_goto()      :: moved to (".l:buf_num.") ".a:buf_name
+   echon "HBUF_goto()        :: moved to (".l:buf_num.") ".a:buf_name
    "---(complete)--------------------------------#
    return
 endfunction
@@ -356,11 +386,15 @@ function! HBUF_update()
    endif
    "---(don't update for special buffer moves)---#
    let l:buf_cur = bufnr('%')
-   if (getbufvar(l:buf_cur, '&modifiable') == 0)
-      return
-   endif
-   if (getbufvar(l:buf_cur, '&buflisted') == 0)
-      return
+   if (buf_num != buf_cur)
+      if (getbufvar(l:buf_cur, '&modifiable') == 0)
+         call HBUF_restore()
+         return
+      endif
+      if (getbufvar(l:buf_cur, '&buflisted') == 0)
+         call HBUF_restore()
+         return
+      endif
    endif
    "---(go to the buffer listing)----------------#
    silent! exec l:win_num.' wincmd w'
@@ -370,108 +404,139 @@ function! HBUF_update()
    call HBUF_list()
    let g:hbuf_locked = "n"
    "---(return to previous window)---------------#
-   wincmd p
+   call HBUF_restore()
    "---(complete)--------------------------------#
    return
 endfunction
 
 
 
-function! HBUF_list()
+func! HBUF_list()
    "---(prepare output vars)---------------------#
-   let l:buf_list    = ""             " initialize the buffer list
-   let l:buf_raw     = ""             " initialize the buffer simple list
+   let   l:buf_list    = ""             " initialize the buffer list
+   let   l:buf_raw     = ""             " initialize the buffer simple list
    "---(prepare loop vars)-----------------------#
-   let l:max_buf_num = bufnr('$')     " number of the last buffer.
-   let l:buf_count = 0                " count of listed buffers
-   let l:i = 1                        " current buffer index
+   let   l:max_buf_num = bufnr('$')     " number of the last buffer.
+   let   l:buf_count   = 0              " count of listed buffers
+   let   g:hbuf_size   = 1
+   let   l:i           = 1              " current buffer index
+   let   l:bufc        = '0'
    "---(initialize mapping)----------------------#
-   while l:i < 9 
-      silent! exec 'map ,'.l:i.'  :call HBUF_goto("UNSET")<cr>'
-      let l:i += 1
-   endwhile
+   while (i < 9)
+      sil!  exec 'map ,'.i.'  :call HBUF_goto("UNSET")<cr>'
+      let   i += 1
+   endw
+   while (i < 16)
+      sil!  exec 'map ,A  :call HBUF_goto("UNSET")<cr>'
+      let   i += 1
+   endw
    "---(process all buffers)---------------------#
-   let l:i = HBUF_next(0)
-   while (l:i > 0)
+   call  HBUF_resize("0")
+   let   i = HBUF_next(0)
+   while (i > 0)
       "---(process name)-------------------------#
-      let l:buf_name = bufname(l:i)
-      if (strlen(l:buf_name) < 1)                 ">> only show named
-         continue
+      let   l:buf_name = bufname(l:i)
+      if    (strlen(l:buf_name) < 1)                 ">> only show named
+         cont
       endif
-      let l:buf_short = fnamemodify(l:buf_name, ":t")
-      let l:buf_short = substitute(l:buf_short, '[][()]', '', 'g')
+      let   l:buf_short = fnamemodify(l:buf_name, ":t")
+      let   l:buf_short = substitute(l:buf_short, '[][()]', '', 'g')
       "---(create meaningful markings)-----------#
-      if (bufwinnr(l:i) > 0)                      ">> if in a window
-         let l:buf_mark = ">"
+      if    (bufwinnr(l:i) > 0)                      ">> if in a window
+         let   l:buf_mark = ">"
       else
-         if(getbufvar(l:i, '&modified') == 1)     ">> not in window, but changed
-            let l:buf_mark = ")"
+         if    (getbufvar(l:i, '&modified') == 1)     ">> not in window, but changed
+            let   l:buf_mark = ")"
          else
-            let l:buf_mark = "]"                  ">> not in window and saved
+            let   l:buf_mark = "]"                  ">> not in window and saved
          endif
       endif
       "---(add to the buffer list)---------------#
-      let l:buf_count += 1
-      let l:buf_list .= printf("%d%s%-18.18s ",
-               \ l:buf_count, l:buf_mark, l:buf_short)
-      let l:buf_raw  .= l:buf_name . " "
-      "---(shortcuts)----------------------------#
-      if l:buf_count < 9
-         silent! exec 'map ,'.l:buf_count.'  :call HBUF_goto("'.l:buf_name.'")<cr>'
+      if    buf_count == 5
+         let   buf_list .= ">>\n"
+         call  HBUF_resize("+")
+      elsei buf_count == 10
+         let   l:buf_list .= ">>\n"
+         call  HBUF_resize("+")
       endif
-      let  l:i = HBUF_next(l:i)
-   endwhile
+      "---(shortcuts)----------------------------#
+      if    buf_count < 10
+         let   buf_list .= printf("%d%s%-18.18s ", l:buf_count, l:buf_mark, l:buf_short)
+         sil!  exec 'nmap          ,'.l:buf_count.'  :call HBUF_goto("'.l:buf_name.'")<cr>'
+      else
+         let   buf_list .= printf("%c%s%-18.18s ", l:buf_count + 55, buf_mark, buf_short)
+         sil!  exec 'nmap           ,'.nr2char(buf_count + 55).'  ,a:call HBUF_goto("'.buf_name.'")<cr>'
+      endif
+      let   buf_raw  .= buf_name . " "
+      let   i = HBUF_next(i)
+      let   buf_count += 1
+   endw
    "---(update if changed)-----------------------#
    if (g:hbuf_list == l:buf_list)
-      return
+      retu
    endif
    let g:hbuf_list = l:buf_list
+   let g:hbuf_raw  = l:buf_raw
    "---(prepare)---------------------------------#
    setlocal modifiable
-   1,$d _
+   1,$d
+   norm  _
    "---(format the list)-------------------------#
-   let  l:buf_list  = printf("%02d ", l:buf_count) . g:hbuf_list
-   let  l:buf_list .= "#" . g:hbuf_times
+   "if   buf_count < 10
+   "   let  l:buf_list  = printf("%1d ", l:buf_count) . g:hbuf_list
+   "else
+   "   let  l:buf_list  = "+ " . g:hbuf_list
+   "endi
+   "let  l:buf_list .= "#" . g:hbuf_times
+   "---(add help)--------------------------------#
+   " TBD
    "---(update)----------------------------------#
+   1,$d
+   norm  _
    put! = l:buf_list
-   2,$d _
-   normal 0
+   norm  0
    "---(done)------------------------------------#
-   setlocal nomodifiable
+   setlo wrap
+   setlo nomodifiable
    "---(complete)--------------------------------#
-   return
-endfunction
+   retu
+endf
 
 
-function! HBUF_save(prefix)
+func! HBUF_save (prefix)
    " return : -1 is failure, 0 is unmodifiable/unbuflisted, >0 is success
-   "---(get the current buffer number)-----------#
-   let l:buf_cur    = bufnr('%')
+   ""---(locals)-----------+-----------+-##
+   let   l:prefix    = "HBUF_save"
+   let   l:rce       = -10
+   let   l:buf_cur   = bufnr('%')
    "---(check for buffer issuse)-----------------#
-   if l:buf_cur < 0
-      echon a:refix."current buffer is invalid...\n"
-      return -1
+   let   l:rce -= 1
+   if   (l:buf_cur < 0)
+      call  HALL_message (l:prefix, "current buffer is not valid", l:rce)
+      retu  l:rce
    endif
-   if (getbufvar(l:buf_cur, '&modifiable') == 0)
-      echon a:prefix."can not execute from specialty (unmodifiable) window...\n"
-      return 0
+   let   l:rce -= 1
+   if    (getbufvar(l:buf_cur, '&modifiable') == 0)
+      call  HALL_message (l:prefix, "can not execute from specialty (unmodifiable) window", l:rce)
+      retu  l:rce
    endif
+   let   l:rce -= 1
    if (getbufvar(l:buf_cur, '&buflisted') == 0)
-      echon a:prefix."can not execute from specialty (unbuflisted) window...\n"
-      return 0
+      call  HALL_message (l:prefix, "can not execute from specialty (unbuflisted) window", l:rce)
+      retu  l:rce
    endif
    "---(get the buffer name)---------------------#
-   let l:full_name = bufname(l:buf_cur)
-   let l:base_loc  = match(l:full_name,"[A-Za-z0-9_.]*$")
-   let l:base_name = strpart(l:full_name,l:base_loc)
+   let   l:full_name    = bufname(l:buf_cur)
+   let   l:base_loc     = match(l:full_name,"[A-Za-z0-9_.]*$")
+   let   l:base_name    = strpart(l:full_name,l:base_loc)
    "---(save off the values)---------------------#
-   let g:hbuf_pbuf    = l:buf_cur
-   let g:hbuf_pname   = l:base_name
-   let g:hbuf_pline   = line('.')
-   let g:hbuf_pcol    = col('.')
+   let   g:hbuf_pbuf    = l:buf_cur
+   let   g:hbuf_pname   = l:base_name
+   let   g:hbuf_pline   = line('.')
+   let   g:hbuf_pcol    = col('.')
    "---(complete)--------------------------------#
-   return g:hbuf_pbuf
-endfunction
+   retu  g:hbuf_pbuf
+endf
 
 
 function! HBUF_saved()
@@ -495,7 +560,7 @@ function! HBUF_restore()
       silent! exec 'b! '.g:hbuf_pbuf
    endif
    if g:hbuf_pline != line('.')
-      normal gg
+      norm  _
       silent! exec "normal ".let g:hbuf_pline."j"
    endif
    if g:hbuf_pcol != col('.')
@@ -507,7 +572,7 @@ endfunction
 
 
 
-function! HBUF_next(buf_num)
+func! HBUF_next(buf_num)
    "---(local variables)-------------------------#
    let l:max  = bufnr('$')          " last buffer.
    let l:cur  = a:buf_num
@@ -530,8 +595,8 @@ function! HBUF_next(buf_num)
       break
    endwhile
    return l:nxt
-endfunction
+endf
 
 
-call HBUF_init()
+call s:HBUF_init()
 ""===[[ END ]]=================================================================#

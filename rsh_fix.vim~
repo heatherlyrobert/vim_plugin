@@ -264,7 +264,7 @@ function! RSH_FIX_compile(std)
    if a:std == "b"
       silent! exec ":silent 1,$!make install"
       normal gg
-      exec printf("normal i%-86.86s\n", "begining of installation feedback")
+      exec printf("normal i%-86.86s\n", "beginning of installation feedback")
       "---(add a footer)----------------------------#
       normal GG
       exec "normal o"
@@ -272,6 +272,7 @@ function! RSH_FIX_compile(std)
    else
       "---(run the compilier)-----------------------#
       if a:std == "m"
+         silent! exec ":silent 1,$!make clean"
          silent! exec ":silent 1,$!make"
       else
          silent! exec ":silent 1,$!".l:gcc_call.l:gcc_std.g:RSH_FIX_sources." -o current"
