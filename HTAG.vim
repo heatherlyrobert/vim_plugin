@@ -481,7 +481,6 @@ func! HTAG_list_BUFSONLY ()
       sil!  exec ":silent! .,$!HTAG.awk 'g_hint_major=".l:g_hint_major."' 'g_hint_minor=".l:g_hint_minor."' 'g_file_name=".l:base_name."'"
       ""---(count total lines)-----------##
       sil!  normal 'x
-      "sil!  exec   "norm dddd"
       sil!  exec   "norm o"
       sil!  exec   ".:!cat ".l:full_name." | wc -l"
       let   total=getline('.')
@@ -499,6 +498,12 @@ func! HTAG_list_BUFSONLY ()
          sil!  exec   "norm odebug :  --- ".printf ("%6d", g_debugging)
          sil!  exec   "norm ocode  :  --- ".printf ("%6d", g_code)
          sil!  exec   "norm oslocl :  --- ".printf ("%6d", g_slocl)
+         "---(collect the 'last tag')------#
+         norm  GG
+         let   l:g_hint_minor = getline('.')
+         norm  Dk
+         let   l:g_hint_major = getline('.')
+         norm  D
          setl  nomodifiable
          let l:i = HBUF_next(l:i)            " buffer index
          continue

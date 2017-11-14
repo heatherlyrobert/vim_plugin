@@ -1,2 +1,2 @@
-#define    VER_NUM "1.5a"
-#define    VER_TXT "expanded tag values to include upper case for big programs"
+#define    VER_NUM "1.5b"
+#define    VER_TXT "fixed the sequential tagging with non-c files"
