@@ -845,6 +845,12 @@ func HTAG_stats ()
    while (g:HTAG_type == "function")
       let   l:c = l:c + 1
       echon "HTAG_stats ()         :: top = ".l:top.", bot = ".l:bot.", cnt = ".l:c.", func = ".g:HTAG_iden
+      norm  mx
+      norm  ,a
+      exec  "norm ".g:HTAG_line."G"
+      redraw!
+      norm  ,t
+      norm  'x
       sleep 100m
       norm  j
       call  HTAG_parse()
