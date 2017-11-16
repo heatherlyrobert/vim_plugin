@@ -1,2 +1,2 @@
-#define    VER_NUM "1.5b"
-#define    VER_TXT "fixed the sequential tagging with non-c files"
+#define    VER_NUM "1.5c"
+#define    VER_TXT "added space in tag data file for function statistics"

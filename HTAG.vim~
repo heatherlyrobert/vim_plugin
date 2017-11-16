@@ -56,6 +56,7 @@ let s:HTAG_tagn     = ""
 let s:HTAG_line     = 0
 let s:HTAG_file     = ""
 let s:HTAG_type     = ""
+let s:HTAG_stat     = ""
 let s:HTAG_iden     = ""
 
 "---(function cursor)----------------------------#
@@ -628,6 +629,7 @@ function! HTAG_parse()
    let  g:HTAG_line    = 0
    let  g:HTAG_file    = ""
    let  g:HTAG_type    = ""
+   let  g:HTAG_stat    = ""
    let  g:HTAG_iden    = ""
    "---(check for null)--------------------------#
    let  l:full_line = getline('.')
@@ -635,19 +637,22 @@ function! HTAG_parse()
       return 0
    endif
    "---(tag number)------------------------------#
-   let  g:HTAG_tagn    = strpart(l:full_line, 0, 2)
+   let  g:HTAG_tagn    = strpart (l:full_line, 0, 2)
    "---(line number)-----------------------------#
    let  g:HTAG_line    = matchstr(l:full_line, "  #1#  .*  #2#  ")
-   let  g:HTAG_line    = strpart(g:HTAG_line, 7, strlen(g:HTAG_line) - 14) + 0
+   let  g:HTAG_line    = strpart (g:HTAG_line, 7, strlen(g:HTAG_line) - 14) + 0
    "---(file name)-------------------------------#
    let  g:HTAG_file    = matchstr(l:full_line, "  #2#  .*  #3#  ")
-   let  g:HTAG_file    = strpart(g:HTAG_file, 7, strlen(g:HTAG_file) - 14)
+   let  g:HTAG_file    = strpart (g:HTAG_file, 7, strlen(g:HTAG_file) - 14)
    "---(tag type)--------------------------------#
    let  g:HTAG_type    = matchstr(l:full_line, "  #3#  .*  #4#  ")
-   let  g:HTAG_type    = strpart(g:HTAG_type, 7, strlen(g:HTAG_type) - 14)
+   let  g:HTAG_type    = strpart (g:HTAG_type, 7, strlen(g:HTAG_type) - 14)
+   "---(statistics)------------------------------#
+   let  g:HTAG_stat    = matchstr(l:full_line, "  #4#  .*  #5#  ")
+   let  g:HTAG_stat    = strpart (g:HTAG_stat, 7, strlen(g:HTAG_stat) - 14)
    "---(identifier)------------------------------#
-   let  g:HTAG_iden    = matchstr(l:full_line, "  #4#  .*  #5#  ")
-   let  g:HTAG_iden    = strpart(g:HTAG_iden, 7, strlen(g:HTAG_iden) - 14)
+   let  g:HTAG_iden    = matchstr(l:full_line, "  #5#  .*  #6#  ")
+   let  g:HTAG_iden    = strpart (g:HTAG_iden, 7, strlen(g:HTAG_iden) - 14)
    "---(debug)-----------------------------------#
    "echo "iden=".g:HTAG_iden.", type=".g:HTAG_type.", line=".g:HTAG_line.", file=".g:HTAG_file
    "sleep 1

@@ -598,23 +598,8 @@ func! HBUF_next(buf_num)
 endf
 
 
-func! HBUF_1st()
-endf
-
-func! HBUF_2nd()
-endf
-
-func! HBUF_3rd()
-endf
-
-func! HBUF_4th()
-endf
-
-func! HBUF_5th()
-endf
 
 call s:HBUF_init()
-
 
 
 
