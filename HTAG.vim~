@@ -120,6 +120,7 @@ func! HTAG_keys ()
    nnor           ;;  :call HTAG_hints  ()<cr>
    nmap  <buffer> t   :call HTAG_update ()<cr>
    nmap  <buffer> h   :call HTAG_hide   ()<cr>
+   nmap  <buffer> s   :call HTAG_stats  ()<cr>
    retu
 endf
 
@@ -811,6 +812,51 @@ function! HTAG_findloc(base_name, line_num)
    "echo "done"
    return l:rtag_final
 endfunction
+
+func HTAG_stats ()
+   let   l:c = 0
+   "---(mark top)-------------------------#
+   norm  _
+   let   l:top = search ("^gyges_cell.c","cW")
+   if    l:top == 0 
+      echon "HTAG_stats ()         :: gyges_cell.c not found"
+      retu  0
+   endif
+   norm  mx
+   "---(find bottom)----------------------#
+   norm  j
+   let   l:bot = search ("   FILE$", "W") - 1
+   if    l:bot == 0 
+      norm  G
+      let   l:bot = line('.')
+   endif
+   "---(find the functions)---------------#
+   norm  'x
+   if    (search ("^function (","W", l:bot) < 1)
+      echon "HTAG_stats ()         :: top = ".l:top.", bot = ".l:bot.", but no function header"
+      retu  0
+   endi 
+   "---(parse the first)------------------#
+   let   l:full_line    = getline('.')
+   norm  mx
+   norm  j
+   call  HTAG_parse()
+   "---(walk the functions)---------------#
+   while (g:HTAG_type == "function")
+      let   l:c = l:c + 1
+      echon "HTAG_stats ()         :: top = ".l:top.", bot = ".l:bot.", cnt = ".l:c.", func = ".g:HTAG_iden
+      sleep 100m
+      norm  j
+      call  HTAG_parse()
+   endw
+   if    (l:c <= 0)
+      echon "HTAG_stats ()         :: top = ".l:top.", bot = ".l:bot.", but no functions found"
+      retu  0
+   endi
+   echon "HTAG_stats ()         :: done"
+   "---(complete)-------------------------#
+   retu  0
+endf
 
 
 
