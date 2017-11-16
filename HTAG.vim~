@@ -140,8 +140,8 @@ endf
 func! HTAG_auto_off ()
    auto! HTAG
    augr! HTAG
-   augr  END
-   retu
+augr  END
+retu
 endf
 
 
@@ -814,7 +814,12 @@ function! HTAG_findloc(base_name, line_num)
 endfunction
 
 func HTAG_stats ()
-   let   l:c = 0
+   "---(locals)----+-------+-----+-----+--#
+   let   l:c       = 0
+   let   l:good    = 0
+   let   l:bad     = 0
+   let   l:recd    = ""
+   let   l:file    = "func.tmp"
    "---(mark top)-------------------------#
    norm  _
    let   l:top = search ("^gyges_cell.c","cW")
@@ -826,7 +831,7 @@ func HTAG_stats ()
    "---(find bottom)----------------------#
    norm  j
    let   l:bot = search ("   FILE$", "W") - 1
-   if    l:bot == 0 
+   if    l:bot == -1
       norm  G
       let   l:bot = line('.')
    endif
@@ -837,29 +842,77 @@ func HTAG_stats ()
       retu  0
    endi 
    "---(parse the first)------------------#
-   let   l:full_line    = getline('.')
    norm  mx
    norm  j
    call  HTAG_parse()
    "---(walk the functions)---------------#
    while (g:HTAG_type == "function")
-      let   l:c = l:c + 1
-      echon "HTAG_stats ()         :: top = ".l:top.", bot = ".l:bot.", cnt = ".l:c.", func = ".g:HTAG_iden
+      "---(update and mark)---------------#
+      let   l:c += 1
       norm  mx
+      "---(update and mark)---------------#
       norm  ,a
       exec  "norm ".g:HTAG_line."G"
-      redraw!
+      "redraw!
+      let   l:recd = getline('.')
+      if    (match (l:recd, g:HTAG_iden) == 0)
+         let   l:good += 1
+         "---(mark top)----------------------#
+         norm  k
+         let   l:beg = line (".")
+         norm  my
+         "---(mark bot)----------------------#
+         let   l:end = search ("^}$", "eW")
+         exec  "norm ".l:end."G"
+         norm  mz
+         "echon "HTAG_stats ()         :: top = ".l:top.", bot = ".l:bot.", beg = ".l:beg.", end = ".l:end
+         "retu  0
+         "---(write to file)-----------------#
+         sil!  exec  ":'y,'zwrite! func.tmp"
+         "---(get to blank above function)---#
+         exec  "norm ".l:beg."G"
+         norm  k
+         ""---(collect data)----------------##
+         sil!  exec   ".:!cat ".l:file." | wc -l"
+         let   l:lines  =getline('.')
+         sil!  exec   ".:!grep \"^[ ]*[\/][*]\" ".l:file." | wc -l"
+         let   l:comm1  =getline('.')
+         sil!  exec   ".:!grep \"^[ ]*[*]\" ".l:file." | wc -l"
+         let   l:comm2  =getline('.')
+         sil!  exec   ".:!grep \"^[ ]*DEBUG_\" ".l:file." | wc -l"
+         let   l:debug  =getline('.')
+         sil!  exec   ".:!grep \"^[ ]*DEBUG_.*yLOG_\" ".l:file." | wc -l"
+         let   l:dlogs  =getline('.')
+         sil!  exec   ".:!grep \"yLOG_\" ".l:file." | wc -l"
+         let   l:ylogs  =getline('.')
+         sil!  exec   ".:!grep \";\" ".l:file." | wc -l"
+         let   l:slocl  =getline('.')
+         sil!  exec   ".:!grep \" return \" ".l:file." | wc -l"
+         let   l:retns  =getline('.')
+         sil!  exec   ".:!grep \" return rce;\" ".l:file." | wc -l"
+         let   l:rces   =getline('.')
+         sil!  exec   ".:!grep \" return -(rce);\" ".l:file." | wc -l"
+         let   l:rces2  =getline('.')
+         sil!  exec   ".:!grep \" return [0-9-]*;\" ".l:file." | wc -l"
+         let   l:retn2  =getline('.')
+         exec  "norm Rlines=".l:lines.", comm1=".l:comm1.", comm2=".l:comm2.", debug=".l:debug.", dlogs=".l:dlogs.", ylogs=".l:ylogs.", slocl=".l:slocl.", retns=".l:retns.", rces=".l:rces.", rcesn=".l:rcesn.", retn2=".l:retn2
+      else
+         let   l:bad  += 1
+      endi
+      "---(go to next function)-----------#
       norm  ,t
       norm  'x
-      sleep 100m
+      "sleep 100m
       norm  j
       call  HTAG_parse()
+      "---(done)--------------------------#
    endw
+   "---(final status)---------------------#
    if    (l:c <= 0)
       echon "HTAG_stats ()         :: top = ".l:top.", bot = ".l:bot.", but no functions found"
       retu  0
    endi
-   echon "HTAG_stats ()         :: done"
+   echon "HTAG_stats ()         :: top = ".l:top.", bot = ".l:bot.", cnt = ".l:c.", good = ".l:good.", bad = ".l:bad
    "---(complete)-------------------------#
    retu  0
 endf
