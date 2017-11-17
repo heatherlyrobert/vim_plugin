@@ -818,8 +818,19 @@ func HTAG_stats ()
    let   l:good    = 0
    let   l:bad     = 0
    let   l:recd    = ""
-   let   l:file    = "func.tmp"
+   let   l:file    = "HTAG_function.c"
    let   l:source  = "gyges_cell.c"
+   let   l:scope   = "-"
+   let   l:rv      = "-"
+   let   l:tsize   = "-"
+   let   l:ssize   = "-"
+   let   l:dsize   = "-"
+   let   l:rsize   = "-"
+   let   l:psize   = "-"
+   let   l:csize   = "-"
+   let   l:msize   = "-"
+   let   l:lsize   = "-"
+   let   l:fsize   = "-"
    "---(mark top)-------------------------#
    norm  _
    let   l:top = search ("^".l:source,"cW")
@@ -853,6 +864,18 @@ func HTAG_stats ()
    call  HTAG_parse()
    "---(walk the functions)---------------#
    while (g:HTAG_type == "function")
+      "---(initialize)--------------------#
+      let   l:scope   = "-"
+      let   l:rv      = "-"
+      let   l:tsize   = "-"
+      let   l:ssize   = "-"
+      let   l:dsize   = "-"
+      let   l:rsize   = "-"
+      let   l:psize   = "-"
+      let   l:csize   = "-"
+      let   l:msize   = "-"
+      let   l:lsize   = "-"
+      let   l:fsize   = "-"
       "---(update and mark)---------------#
       let   l:c += 1
       norm  mx
@@ -865,7 +888,9 @@ func HTAG_stats ()
          let   l:good += 1
          "---(mark top)----------------------#
          norm  k
+         norm  my
          let   l:beg    = line (".")
+         "---(determine type)----------------#
          let   l:type   = getline('.')
          if    (match (l:type, "char[*]")     >= 0)
             let   l:rv     = "s"
@@ -874,18 +899,27 @@ func HTAG_stats ()
          else
             let   l:rv     = "v"
          endi
+         "---(determine scope)---------------#
          if    (match (g:HTAG_iden, "__unit") >  0)
             let   l:scope  = "u"
          elsei (match (g:HTAG_iden, "__"    ) >  0)
-            let   l:scope  = "p"
-         elsei (match (l:file, "y")           == 0)
-            let   l:scope  = "y"
+            let   l:scope  = "f"
          elsei (match (l:type, "static")      == 0)
             let   l:scope  = "s"
          else
             let   l:scope  = "g"
          endi
-         norm  my
+         "---(count params)------------------#
+         let   l:parms = len (split (l:recd, "\,")) - 1
+         if    (match (l:recd, "()") >  0)
+            let   l:psize = "0"
+         elsei (match (l:recd, "(void)") >  0)
+            let   l:psize = "0"
+         elsei (l:parms > 9)
+            let   l:psize = "#"
+         else
+            let   l:psize = l:parms + 1
+         endi
          "---(mark bot)----------------------#
          let   l:end = search ("^}$", "eW")
          exec  "norm ".l:end."G"
@@ -893,7 +927,7 @@ func HTAG_stats ()
          "echon "HTAG_stats ()         :: top = ".l:top.", bot = ".l:bot.", beg = ".l:beg.", end = ".l:end
          "retu  0
          "---(write to file)-----------------#
-         sil!  exec  ":'y,'zwrite! func.tmp"
+         sil!  exec  ":'y,'zwrite! ".l:file
          "---(get to blank above function)---#
          exec  "norm ".l:beg."G"
          norm  k
@@ -917,11 +951,6 @@ func HTAG_stats ()
          ""---(slocl)--------------------""
          sil!  exec   ".:!cat ".l:file." | tr -cd \";\" | wc -c"
          let   l:colon  = getline('.')
-         if    (l:colon >= 360)
-            let   l:size = "#"
-         else
-            let   l:size = strpart ("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ", l:total / 10, 1)
-         endi
          ""---(returns)------------------""
          sil!  exec   ".:!grep \" return \" ".l:file." | wc -l"
          let   l:retns  = getline('.')
@@ -933,32 +962,92 @@ func HTAG_stats ()
          let   l:rcesn  = getline('.')
          sil!  exec   ".:!grep \" return [0-9-]*;\" ".l:file." | wc -l"
          let   l:retn2  = getline('.')
+         ""---(locals)-------------------""
+         sil!  exec   ".:!ctags -x --sort=no --c-kinds=l ".l:file." | wc -l"
+         let   l:local  = getline('.')
+         ""---(func calls)---------------""
+         sil!  exec   ".:!cflow -d 2 ".l:file." | wc -l"
+         let   l:funca  = getline('.')
+         sil!  exec   ".:!cflow -d 2 ".l:file." | grep \"^[ ]*y\" | wc -l"
+         let   l:funcl  = getline('.')
+         sil!  exec   ".:!cflow -d 2 ".l:file." | grep \"^[ ]*yLOG\" | wc -l"
+         let   l:funcd  = getline('.')
+         sil!  exec   ".:!cflow -d 2 ".l:file." | grep \"^[ ]*[a-xz]\" | wc -l"
+         let   l:funcc  = getline('.')
+         ""---(decisions)----------------""
+         sil!  exec   ".:!grep \" if[ ]*(\" ".l:file." | wc -l"
+         let   l:cif    = getline('.')
+         sil!  exec   ".:!grep \" else[ ]*if[ ]*(\" ".l:file." | wc -l"
+         let   l:celif  = getline('.')
+         sil!  exec   ".:!grep \" else \" ".l:file." | wc -l"
+         let   l:celse  = getline('.')
+         sil!  exec   ".:!grep \" switch[ ]*(\" ".l:file." | wc -l"
+         let   l:cswi   = getline('.')
+         sil!  exec   ".:!grep \" while[ ]*(\" ".l:file." | wc -l"
+         let   l:cwhi   = getline('.')
+         ""---(memory)-------------------""
+         sil!  exec   ".:!grep \" free[ ]*(\" ".l:file." | wc -l"
+         let   l:mfree  = getline('.')
+         sil!  exec   ".:!grep \" malloc[ ]*(\" ".l:file." | wc -l"
+         let   l:mmall  = getline('.')
+         sil!  exec   ".:!grep \" cmalloc[ ]*(\" ".l:file." | wc -l"
+         let   l:mcmall = getline('.')
          ""---(summary)------------------""
          let   l:comms  = l:comm1 + l:comm2 + l:empty
          let   l:debug  = l:dlogs + (l:ylogs - l:dlogs) + (l:yurg - l:dlogs)
          let   l:code   = l:total - l:comms - l:debug
          let   l:slocl  = l:colon - l:debug
+         let   l:choos  = l:cif + (l:celse - l:celif) + l:cswi + l:cwhi
+         let   l:mem    = l:mfree + l:mmall + l:mcmall
+         let   l:funcs  = l:funca - l:funcd - 1
          if    (l:total >= 360)
             let   l:tsize = "#"
          elsei (l:total <=   0)
-            let   l:tsize = "-"
+            let   l:tsize = "0"
          else
-            let   l:tsize = strpart ("0123456789abcdefghijklmnopqrstuvwxyz", l:total / 10, 1)
-         endi
-         if    (l:comms <=   0)
-            let   l:csize = "-"
-         else
-            let   l:csize = strpart ("0123456789abcdefghijklmnopqrstuvwxyz", (l:comms * 10) / l:slocl, 1)
-         endi
-         if    (l:debug <=   0)
-            let   l:dsize = "-"
-         else
-            let   l:dsize = strpart ("0123456789", (l:debug * 10) / l:slocl, 1)
+            let   l:tsize = strpart ("123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ", l:total / 10, 1)
          endi
          if    (l:slocl >= 360)
             let   l:ssize = "#"
+         elsei (l:slocl <=   0)
+            let   l:ssize = "0"
          else
-            let   l:ssize = strpart ("0123456789abcdefghijklmnopqrstuvwxyz", l:slocl  / 10, 1)
+            let   l:ssize = strpart ("123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ", l:slocl  / 10, 1)
+         endi
+         if    (l:debug >= 360)
+            let   l:dsize = "#"
+         elsei (l:debug <=   0)
+            let   l:dsize = "0"
+         else
+            let   l:dsize = strpart ("123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ", l:debug  / 10, 1)
+         endi
+         if    (l:choos >= 36)
+            let   l:csize = "#"
+         elsei (l:choos <=   0)
+            let   l:csize = "0"
+         else
+            let   l:csize = strpart ("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ", l:choos, 1)
+         endi
+         if    (l:mem   >= 36)
+            let   l:msize = "#"
+         elsei (l:mem   <=   0)
+            let   l:msize = "0"
+         else
+            let   l:msize = strpart ("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ", l:mem  , 1)
+         endi
+         if    (l:local >= 36)
+            let   l:lsize = "#"
+         elsei (l:local <=   0)
+            let   l:lsize = "0"
+         else
+            let   l:lsize = strpart ("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ", l:local, 1)
+         endi
+         if    (l:funcs >= 36)
+            let   l:fsize = "#"
+         elsei (l:funcs <=   0)
+            let   l:fsize = "0"
+         else
+            let   l:fsize = strpart ("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ", l:funcs, 1)
          endi
          if    (l:rv  == "c")
             if    (l:rces  > 0)
@@ -969,17 +1058,28 @@ func HTAG_stats ()
                let   l:rv     = "e"
             endi
          endi
-         exec  "norm Rtotal=".l:total.", tsize=".l:tsize.", scope=".l:scope.", rv=".l:rv.", comms=".l:comms.", csize=".l:csize.", debug=".l:debug.", dsize=".l:dsize.", slocl=".l:slocl.", ssize=".l:ssize.", retns=".l:retns.", rces=".l:rces.", rcesn=".l:rcesn.", retn2=".l:retn2
+         if    (l:retns == 0)
+            let   l:rsize = "0"
+         elsei (l:retns >  9)
+            let   l:rsize = "#"
+         else
+            let   l:rsize = l:retns
+         endi
+         exec  ":norm  0D"
       else
          let   l:bad  += 1
       endi
       "---(go to next function)-----------#
       norm  ,t
       norm  'x
-      "exec  ":norm  120|R".l:scope
+      setl  modifiable
+      exec  ":norm  120|R".l:scope.l:rv
+      exec  ":norm  122|R".l:tsize.l:ssize.l:dsize
+      exec  ":norm  125|R".l:psize.l:lsize.l:rsize
+      exec  ":norm  128|R".l:csize.l:fsize.l:msize
+      setl  nomodifiable
       "sleep 100m
-      "norm  0
-      norm  j
+      norm  0j
       call  HTAG_parse()
       "---(done)--------------------------#
    endw
