@@ -127,7 +127,8 @@ func! HTAG_keys ()
    nnor           ;;  :call HTAG_hints   ()<cr>
    nmap  <buffer> t   :call HTAG_update  ()<cr>
    nmap  <buffer> h   :call HTAG_hide    ()<cr>
-   nmap  <buffer> s   :call HTAG_stats_full  ()<cr>
+   nmap  <buffer> s   :call HTAG_stats_full  ("r")<cr>
+   nmap  <buffer> S   :call HTAG_stats_full  ("w")<cr>
    retu
 endf
 
@@ -482,15 +483,15 @@ func! HTAG_list_BUFSONLY ()
       ""---(mark the start of new file)--##
       setl  modifiable
       norm  GG
-      sil!  normal mx
+      sil!  normal mX
       ""---(run the tags)----------------##
       ""sil!  exec "$:!ctags -x --sort=no --c-kinds=cdefgnpstuvx --c++-kinds=cdefgnpstuvx --file-scope=yes ".l:full_name
       sil!  exec "$:!ctags -x --sort=no --file-scope=yes ".l:full_name
       "---(go back and awk them)--------#
-      sil!  normal 'x
+      sil!  normal 'X
       sil!  exec ":silent! .,$!HTAG.awk 'g_hint_major=".l:g_hint_major."' 'g_hint_minor=".l:g_hint_minor."' 'g_file_name=".l:base_name."'"
       ""---(count total lines)-----------##
-      sil!  normal 'x
+      sil!  normal 'X
       sil!  exec   "norm o"
       sil!  exec   ".:!cat ".l:full_name." | wc -l"
       let   total=getline('.')
@@ -581,9 +582,9 @@ function! HTAG_func_syn(base_name)
       let  l:stop_line    = line('.')
    endif
    "---(find the functions)----------------------#
-   silent! normal 'x
+   silent! normal 'X
    let  l:curr_line = search("function (","W", l:stop_line)
-   silent! exec "normal mx"
+   silent! exec "normal mX"
    if l:curr_line == 0
       return
    endif
@@ -594,7 +595,7 @@ function! HTAG_func_syn(base_name)
    let  l:rtag_iden    = " "
    let  l:rtag_list    = []
    while l:curr <= l:count
-      silent! exec "normal 'x"
+      silent! exec "normal 'X"
       exec "normal ".l:curr."j"
       let  l:full_line    = getline('.')
       if l:full_line == ""
@@ -689,7 +690,7 @@ function! HTAG_head(file, type)
       echon "HTAG_head()         :: could not file file entry for ".a:file." FATAL"
       return -1
    endif
-   normal mx
+   normal mX
    normal j
    let l:stop_line  = search("   FILE$", "W") - 1
    if l:stop_line == -1
@@ -697,7 +698,7 @@ function! HTAG_head(file, type)
       let  l:stop_line    = line('.')
    endif
    "---(find the functions)----------------------#
-   normal 'x
+   normal 'X
    if (search("function (","W", l:stop_line) < 1)
       echon "HTAG_findloc()        :: no functions in file ".a:base_name."..."
       return 0
@@ -705,11 +706,11 @@ function! HTAG_head(file, type)
    let  l:full_line    = getline('.')
    let  l:count        = matchstr(l:full_line, "(.*)")
    let  l:count        = strpart(l:count, 1, strlen(l:count) - 2 ) - 0
-   normal mx
+   normal mX
    normal j
    call HTAG_parse()
    "---(save context)----------------------------#
-   normal 'x
+   normal 'X
    let  g:HTAG_cfile   = a:file
    let  g:HTAG_ctype   = a:type
    let  g:HTAG_chead   = line('.')
@@ -776,7 +777,7 @@ function! HTAG_findloc(base_name, line_num)
    if (l:start_line < 1)
       return "[--] n/a       "
    endif
-   silent! exec "normal mx"
+   silent! exec "normal mX"
    "> start of next buffer entriies
    normal j
    let l:stop_line  = search("   FILE$", "W") - 1
@@ -786,9 +787,9 @@ function! HTAG_findloc(base_name, line_num)
       let  l:stop_line    = line('.')
    endif
    "---(find the functions)----------------------#
-   silent! exec "normal 'x"
+   silent! exec "normal 'X"
    let  l:curr_line = search("function (","W", l:stop_line)
-   silent! exec "normal mx"
+   silent! exec "normal mX"
    if l:curr_line == 0
       "echon "HTAG_findloc()        :: no functions in file ".a:base_name."..."
       return "[--] <<global>>"
@@ -800,7 +801,7 @@ function! HTAG_findloc(base_name, line_num)
    let  l:rtag_iden    = " "
    let  l:rtag_final   = "[--] <<global>>"
    while l:curr <= l:count
-      silent! exec "normal 'x"
+      silent! exec "normal 'X"
       exec "normal ".l:curr."j"
       if (HTAG_parse() < 1)
          break
@@ -817,6 +818,9 @@ function! HTAG_findloc(base_name, line_num)
 endf
 
 let   s:HTAG_shead    = "-"
+let   s:HTAG_sprefix  = ""
+let   s:HTAG_stitle   = ""
+let   s:HTAG_sclass   = ""
 let   s:HTAG_sscope   = "-"
 let   s:HTAG_srv      = "-"
 let   s:HTAG_stsize   = "-"
@@ -831,8 +835,11 @@ let   s:HTAG_sfsize   = "-"
 let   s:HTAG_sisize   = "-"
 let   s:HTAG_sadjust  = 0
 
-func HTAG_stats_head  ()
-   ""---(initialize)---------------------""
+func HTAG_stats_prep  ()
+   let   s:HTAG_shead    = "-"
+   let   s:HTAG_sprefix  = ""
+   let   s:HTAG_stitle   = ""
+   let   s:HTAG_sclass   = ""
    let   s:HTAG_sscope   = "-"
    let   s:HTAG_srv      = "-"
    let   s:HTAG_stsize   = "-"
@@ -845,9 +852,27 @@ func HTAG_stats_head  ()
    let   s:HTAG_slsize   = "-"
    let   s:HTAG_sfsize   = "-"
    let   s:HTAG_sisize   = "-"
-   let   s:HTAG_stitle   = ""
-   let   s:HTAG_sprefix  = ""
-   let   s:HTAG_shead    = ""
+   retu  0
+endf
+
+func HTAG_stats_check ()
+   let   l:type   = getline('.')
+   if    (strpart (l:type, 77, 3) != "]*/")
+      retu  -1
+   endif
+   if    (strpart (l:type, 62, 2) != " [")
+      retu  -2
+   endif
+   if    (strpart (l:type, 53, 3) != "-[ ")
+      retu  -3
+   endif
+   if    (strpart (l:type, 12, 6) != " /*-> ")
+      retu  -4
+   endif
+   retu  0
+endf
+
+func HTAG_stats_head  ()
    ""---(check function)-----------------""
    exec  "norm ".(g:HTAG_line + s:HTAG_sadjust)."G"
    redraw!
@@ -864,25 +889,16 @@ func HTAG_stats_head  ()
    endi
    norm  j
    "---(mark top)----------------------#
-   norm  my
+   norm  mY
    let   l:beg    = line (".")
    let   l:type   = getline('.')
    "---(determine header quality)------#
    let   s:HTAG_shead   = "y"
-   if    (strpart (l:type, 77, 3) != "]*/")
+   if    (HTAG_stats_check () < 0)
       let   s:HTAG_shead   = "-"
-   endif
-   if    (strpart (l:type, 62, 2) != " [")
-      let   s:HTAG_shead   = "-"
-   endif
-   if    (strpart (l:type, 53, 3) != "-[ ")
-      let   s:HTAG_shead   = "-"
-   endif
-   if    (strpart (l:type, 12, 6) != " /*-> ")
-      let   s:HTAG_shead   = "-"
-   endif
+   endi
    "---(determine title)---------------#
-   let   l:loc1   = match (l:type, "/[*]")
+   let   l:loc    = match (l:type, "/[*]")
    if    (l:loc1 >= 0)
       let   s:HTAG_sprefix = strpart (l:type, 0, l:loc1 - 1)
       let   l:loc1   = match   (l:type, "[A-Za-z0-9]", l:loc1 + 1)
@@ -913,10 +929,12 @@ func HTAG_stats_head  ()
       let   s:HTAG_srv     = "s"
    elsei (match (s:HTAG_sprefix, "char" )       >= 0)
       let   s:HTAG_srv     = "c"
+   elsei (match (s:HTAG_sprefix, "void" )       >= 0)
+      let   s:HTAG_srv     = "v"
    elsei (match (s:HTAG_sprefix, "[*]")         >= 0)
       let   s:HTAG_srv     = "p"
    else
-      let   s:HTAG_srv     = "v"
+      let   s:HTAG_srv     = "n"
    endi
    "---(count params)------------------#
    let   l:parms = len (split (l:recd, "\,")) - 1
@@ -932,7 +950,7 @@ func HTAG_stats_head  ()
    "---(mark bot)----------------------#
    let   l:end = search ("^}$", "eW")
    exec  "norm ".l:end."G"
-   norm  mz
+   norm  mZ
    "---(get to blank above function)---#
    exec  "norm ".l:beg."G"
    norm  k
@@ -948,7 +966,7 @@ func HTAG_stats_size  ()
    ""---(locals)-------------------""
    let   l:file    = "htag.c"
    ""---(write function out)-------------""
-   sil!  exec  ":'y,'zwrite! ".l:file
+   sil!  exec  ":'Y,'Zwrite! ".l:file
    ""---(total size)---------------------""
    sil!  exec   ".:!cat ".l:file." | wc -l"
    let   l:total  = getline('.')
@@ -1133,51 +1151,106 @@ endf
 func HTAG_stats_write ()
    ""---(handle groups)------------------""
    if    (s:HTAG_sscope == "-")
-      norm  ,t
-      norm  'x
-      if    (match (g:HTAG_iden, "o___") >= 0)
-         let   s:HTAG_sgroup   += 1
-         setl  modifiable
-         exec  ":norm  120|Rsr tsd plr cf mi "
-         setl  nomodifiable
-      else
-         let   s:HTAG_sbad     += 1
-      endi
       retu  0
    endif
-   let   s:HTAG_sgood    += 1
    ""---(new header)---------------------""
+   norm  0D
    if    (s:HTAG_shead == "-")
-      exec  ":norm  0DR".printf ("%-12.12s", s:HTAG_sprefix)." /*-> ------------------------------------[ ------ [--.---.---.--]*/"
-   elsei (s:HTAG_shead == "r")
-      norm  0D
-      norm  j
-      norm  0D
-      exec  ":norm  0DR".printf ("%-12.12s", s:HTAG_sprefix)." /*-> ------------------------------------[ ------ [--.---.---.--]*/"
+      exec  ":norm  o".printf ("%-12.12s", s:HTAG_sprefix)." /*-> ------------------------------------[ ------ [--.---.---.--]*/ /*-[--.---.---.--]-*/"
+      let   s:HTAG_sadjust  += 1
    else
-      norm  0D
       norm  j
+      norm  0D
+      exec  ":norm  0DR".printf ("%-12.12s", s:HTAG_sprefix)." /*-> ------------------------------------[ ------ [--.---.---.--]*/ /*-[--.---.---.--]-*/"
    endi
    exec  ":norm  19|R".s:HTAG_stitle." "
    exec  ":norm  65|R".s:HTAG_sscope.s:HTAG_srv
    exec  ":norm  68|R".s:HTAG_stsize.s:HTAG_sssize.s:HTAG_sdsize
    exec  ":norm  72|R".s:HTAG_spsize.s:HTAG_slsize.s:HTAG_srsize
    exec  ":norm  76|R".s:HTAG_scsize.s:HTAG_sfsize
-   ""---(update tag entry)---------------""
-   norm  ,t
-   norm  'x
-   setl  modifiable
-   exec  ":norm  120|R".s:HTAG_sscope.s:HTAG_srv."."
-   exec  ":norm  123|R".s:HTAG_stsize.s:HTAG_sssize.s:HTAG_sdsize."."
-   exec  ":norm  127|R".s:HTAG_spsize.s:HTAG_slsize.s:HTAG_srsize."."
-   exec  ":norm  131|R".s:HTAG_scsize.s:HTAG_sfsize."."
-   exec  ":norm  134|R".s:HTAG_smsize.s:HTAG_sisize."."
-   setl  nomodifiable
+   exec  ":norm  86|R".s:HTAG_smsize.s:HTAG_sisize
    "---(complete)-------------------------#
    retu  0
 endf
 
-func HTAG_stats_file  (bufno)
+func HTAG_stats_read  ()
+   ""---(check function)-----------------""
+   exec  "norm ".g:HTAG_line."G"
+   let   l:recd  = getline('.')
+   if    (match (l:recd, g:HTAG_iden) != 0)
+      retu  0
+   endi
+   ""---(check for prefix)---------------""
+   norm  k
+   let   l:space = getline('.')
+   if    (l:space == "")
+      retu  0
+   endi
+   "---(determine header quality)--------""
+   if    (HTAG_stats_check () < 0)
+      retu  0
+   endi
+   let   l:recd  = getline('.')
+   ""---(parse base values)--------------""
+   let   s:HTAG_sprefix = strpart (l:recd,  0, 12)
+   let   l:loc          = match   (l:recd, " -*[ ", 20)
+   let   s:HTAG_stitle  = strpart (l:recd, 18, l:loc - 18)
+   let   l:loc          = match   (l:recd, " ", 57)
+   let   s:HTAG_sclass  = strpart (l:recd, 56, l:loc - 56)
+   let   s:HTAG_sscope  = strpart (l:recd, 64, 1)
+   let   s:HTAG_srv     = strpart (l:recd, 65, 1)
+   let   s:HTAG_stsize  = strpart (l:recd, 67, 1)
+   let   s:HTAG_sssize  = strpart (l:recd, 68, 1)
+   let   s:HTAG_sdsize  = strpart (l:recd, 69, 1)
+   let   s:HTAG_spsize  = strpart (l:recd, 71, 1)
+   let   s:HTAG_slsize  = strpart (l:recd, 72, 1)
+   let   s:HTAG_srsize  = strpart (l:recd, 73, 1)
+   let   s:HTAG_scsize  = strpart (l:recd, 75, 1)
+   let   s:HTAG_sfsize  = strpart (l:recd, 76, 1)
+   ""---(parse extended values)----------""
+   if    (strpart (l:recd, 80, 5) != " /*-[")
+      retu  0
+   endif
+   if    (strpart (l:recd, 98, 4) != "]-*/")
+      retu  0
+   endif
+   let   s:HTAG_smsize  = strpart (l:recd, 85, 1)
+   let   s:HTAG_sisize  = strpart (l:recd, 86, 1)
+   ""---(complete)-----------------------""
+   retu  0
+endf
+
+func HTAG_stats_tag   ()
+   ""---(go to tags)---------------------""
+   norm  ,t
+   norm  'X
+   setl  modifiable
+   ""---(handle groups)------------------""
+   if    (s:HTAG_sscope == "-")
+      if    (match (g:HTAG_iden, "o___") >= 0)
+         let   s:HTAG_sgroup   += 1
+         exec  ":norm  120|Rsr tsd plr cf  mi --- --- -- "
+      else
+         let   s:HTAG_sbad     += 1
+      endi
+   endif
+   ""---(update tag entry)---------------""
+   if    (s:HTAG_sscope != "-")
+      let   s:HTAG_sgood    += 1
+      exec  ":norm  120|R".s:HTAG_sscope.s:HTAG_srv."."
+      exec  ":norm  123|R".s:HTAG_stsize.s:HTAG_sssize.s:HTAG_sdsize."."
+      exec  ":norm  127|R".s:HTAG_spsize.s:HTAG_slsize.s:HTAG_srsize."."
+      exec  ":norm  131|R".s:HTAG_scsize.s:HTAG_sfsize.".."
+      exec  ":norm  135|R".s:HTAG_smsize.s:HTAG_sisize."."
+      exec  ":norm  222|R".s:HTAG_stitle
+      exec  ":norm  269|R".s:HTAG_sclass
+   endif
+   "---(complete)-------------------------#
+   setl  nomodifiable
+   retu  0
+endf
+
+func HTAG_stats_file  (action, bufno)
    ""---(get the file name)-----------##
    let   l:source = bufname (a:bufno)
    let   l:loc    = match   (l:source, "[A-Za-z0-9_.]*$")
@@ -1196,7 +1269,7 @@ func HTAG_stats_file  (bufno)
    if    (l:top == 0)
       retu  0
    endif
-   norm  mx
+   norm  mX
    ""---(find bottom)--------------------""
    norm  j
    let   l:bot = search ("   FILE$", "W") - 1
@@ -1205,26 +1278,36 @@ func HTAG_stats_file  (bufno)
       let   l:bot = line('.')
    endif
    "---(find the functions)---------------#
-   norm  'x
+   norm  'X
    if    (search ("^function (","W", l:bot) < 1)
       retu  0
    endi 
    "---(parse the first)------------------#
-   norm  mx
+   norm  mX
    norm  j
    call  HTAG_parse ()
    "---(walk the functions)---------------#
    let   s:HTAG_sadjust  = 0
    while (g:HTAG_type == "function")
-      ""---(mark)---------------------------""
+      ""---(common)-------------------------""
       let   s:HTAG_sfunc += 1
-      norm  mx
+      norm  mX
       norm  ,a
       call  HBUF_goto (l:source)
-      call  HTAG_stats_head  ()           
-      call  HTAG_stats_size  ()           
-      call  HTAG_stats_stat  ()           
-      call  HTAG_stats_write ()           
+      call  HTAG_stats_prep  ()           
+      ""---(read)---------------------------""
+      if    (a:action == "r")
+         call  HTAG_stats_read  ()           
+      endi
+      ""---(write)--------------------------""
+      if    (a:action == "w")
+         call  HTAG_stats_head  ()           
+         call  HTAG_stats_size  ()           
+         call  HTAG_stats_stat  ()           
+         call  HTAG_stats_write ()           
+      endi
+      ""---(common)-------------------------""
+      call  HTAG_stats_tag   ()           
       norm  0j
       call  HTAG_parse       ()
    endw
@@ -1232,7 +1315,7 @@ func HTAG_stats_file  (bufno)
    retu  0
 endf
 
-func HTAG_stats_full  ()
+func HTAG_stats_full  (action)
    ""---(clear stats)------+-----+-----+-""
    let   s:HTAG_sfile      = 0
    let   s:HTAG_scfile     = 0
@@ -1244,7 +1327,7 @@ func HTAG_stats_full  ()
    let   l:bufno           = HBUF_next (0)
    ""---(run each file)------------------""
    while (l:bufno > 0)
-      call  HTAG_stats_file (l:bufno)
+      call  HTAG_stats_file (a:action, l:bufno)
       let   l:bufno = HBUF_next (l:bufno)
    endw
    ""---(final status)-------------------""
@@ -1254,7 +1337,6 @@ func HTAG_stats_full  ()
    ""---(complete)-----------------------""
    retu  0
 endf
-
 
 
 

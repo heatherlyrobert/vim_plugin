@@ -51,9 +51,10 @@ function list_type(a_file, a_type, a_tagged) {
          if (g_hint_minor >  52)                        g_2nd = 35;
          #---(print a well formatted line)----------#
          # these column separators make later regex matting unambiguous
-         printf("%c%c  %-40.40s  #1#  %-5d  #2#  %-22.22s  #3#  %-20.20s  #4#  ------------------------  #5#  %-60.60s  #6#  \n",
+         printf("%c%c  %-40.40s  #1#  %-5d  #2#  %-22.22s  #3#  %-20.20s  #4#  --.---.---.--..--.---.---.--  #5#  %-60.60s  #6#  %-40.40s  #7#  %-10.10s  #8#  \n",
                 g_1st, g_2nd, g_name[x],
-                g_line[x], g_file[x], g_type[x], g_name[x]);
+                g_line[x], g_file[x], g_type[x], g_name[x],
+                "-", "-");
       }
    }
    #---(add a separator)-------------------------#
