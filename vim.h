@@ -1,2 +1,2 @@
-#define    VER_NUM "1.5j"
-#define    VER_TXT "HTAG_stats creates a new potential header line for function"
+#define    VER_NUM "1.5l"
+#define    VER_TXT "HTAG_stats used on gyges successfully"

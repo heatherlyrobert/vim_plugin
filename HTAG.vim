@@ -66,6 +66,13 @@ let s:HTAG_chead    = 0
 let s:HTAG_ccount   = 0
 let s:HTAG_ccurr    = 0
 
+""---(stats processing)---------------""
+let   s:HTAG_sfile    = 0
+let   s:HTAG_scfile   = 0
+let   s:HTAG_sfunc    = 0
+let   s:HTAG_sgood    = 0
+let   s:HTAG_sgroup   = 0
+let   s:HTAG_sbad     = 0
 
 
 
@@ -116,11 +123,11 @@ endf
 
 ""=[[ establish buffer specific key mapping ]]============[ leaf   [ 110n0x ]=##
 func! HTAG_keys ()
-   nmap           ,t  :call HTAG_show   ()<cr>
-   nnor           ;;  :call HTAG_hints  ()<cr>
-   nmap  <buffer> t   :call HTAG_update ()<cr>
-   nmap  <buffer> h   :call HTAG_hide   ()<cr>
-   nmap  <buffer> s   :call HTAG_stats  ()<cr>
+   nmap           ,t  :call HTAG_show    ()<cr>
+   nnor           ;;  :call HTAG_hints   ()<cr>
+   nmap  <buffer> t   :call HTAG_update  ()<cr>
+   nmap  <buffer> h   :call HTAG_hide    ()<cr>
+   nmap  <buffer> s   :call HTAG_stats_full  ()<cr>
    retu
 endf
 
@@ -401,11 +408,11 @@ func! HTAG_list_BUFSONLY ()
    let    l:g_debugging  = 0
    let    l:g_code       = 0
    let    l:g_slocl      = 0
-   ""---(clear out existing contents)------------#
+   ""---(clear out existing contents)-----#
    setl   modifiable
    sil    exec ":1,$delete"
    setl   nomodifiable
-   "---(get the totals)--------------------------#
+   "---(get the grand totals first)-------#
    let    l:i = HBUF_next (0)              " buffer index
    while  (l:i > 0)
       ""---(clear it out)----------------##
@@ -422,7 +429,7 @@ func! HTAG_list_BUFSONLY ()
       let   total  =getline('.')
       sil!  exec   ".:!grep \"^[ ]*$\" ".l:full_name." | wc -l"
       let   empty  =getline('.')
-      "---(grand totals)----------------#
+      "---(grand totals)-----------------#
       let   g_total     += total
       let   g_empty     += empty
       ""---(skip non-c files)------------##
@@ -443,7 +450,6 @@ func! HTAG_list_BUFSONLY ()
       sil!  exec   ".:!grep \"yLOG_\" ".l:full_name." | wc -l"
       let   ylogs  =getline('.')
       ""---(slocl)-----------------------""
-      " sil!  exec   ".:!grep \";\" ".l:full_name." | wc -l"
       sil!  exec   ".:!cat ".l:full_name." | tr -cd \";\" | wc -c"
       let   slocl  =getline('.')
       ""---(calculate stats)-------------##
@@ -556,9 +562,7 @@ func! HTAG_list_BUFSONLY ()
       let   l:g_hint_major = getline('.')
       norm  D
       setl  nomodifiable
-      "---(go back and awk them)--------#
-      "silent! normal 'x
-      "call HTAG_func_syn(l:base_name)
+      "---(prep next)-------------------#
       let l:i = HBUF_next(l:i)            " buffer index
    endwhile
    norm  _
@@ -810,309 +814,447 @@ function! HTAG_findloc(base_name, line_num)
    "---(complete)--------------------------------#
    "echo "done"
    return l:rtag_final
-endfunction
+endf
 
-func HTAG_stats ()
-   "---(locals)----+-------+-----+-----+--#
-   let   l:c       = 0
-   let   l:good    = 0
-   let   l:bad     = 0
-   let   l:recd    = ""
-   let   l:file    = "HTAG_function.c"
-   let   l:source  = "gyges_cell.c"
-   let   l:scope   = "-"
-   let   l:rv      = "-"
-   let   l:tsize   = "-"
-   let   l:ssize   = "-"
-   let   l:dsize   = "-"
-   let   l:rsize   = "-"
-   let   l:psize   = "-"
-   let   l:csize   = "-"
-   let   l:msize   = "-"
-   let   l:lsize   = "-"
-   let   l:fsize   = "-"
+let   s:HTAG_shead    = "-"
+let   s:HTAG_sscope   = "-"
+let   s:HTAG_srv      = "-"
+let   s:HTAG_stsize   = "-"
+let   s:HTAG_sssize   = "-"
+let   s:HTAG_sdsize   = "-"
+let   s:HTAG_srsize   = "-"
+let   s:HTAG_spsize   = "-"
+let   s:HTAG_scsize   = "-"
+let   s:HTAG_smsize   = "-"
+let   s:HTAG_slsize   = "-"
+let   s:HTAG_sfsize   = "-"
+let   s:HTAG_sisize   = "-"
+let   s:HTAG_sadjust  = 0
+
+func HTAG_stats_head  ()
+   ""---(initialize)---------------------""
+   let   s:HTAG_sscope   = "-"
+   let   s:HTAG_srv      = "-"
+   let   s:HTAG_stsize   = "-"
+   let   s:HTAG_sssize   = "-"
+   let   s:HTAG_sdsize   = "-"
+   let   s:HTAG_srsize   = "-"
+   let   s:HTAG_spsize   = "-"
+   let   s:HTAG_scsize   = "-"
+   let   s:HTAG_smsize   = "-"
+   let   s:HTAG_slsize   = "-"
+   let   s:HTAG_sfsize   = "-"
+   let   s:HTAG_sisize   = "-"
+   let   s:HTAG_stitle   = ""
+   let   s:HTAG_sprefix  = ""
+   let   s:HTAG_shead    = ""
+   ""---(check function)-----------------""
+   exec  "norm ".(g:HTAG_line + s:HTAG_sadjust)."G"
+   redraw!
+   let   l:recd  = getline('.')
+   if    (match (l:recd, g:HTAG_iden) != 0)
+      retu  0
+   endi
+   ""---(verify space)-------------------""
+   norm  kk
+   let   l:space = getline('.')
+   if    (l:space != "")
+      norm  o
+      let   s:HTAG_sadjust  += 1
+   endi
+   norm  j
+   "---(mark top)----------------------#
+   norm  my
+   let   l:beg    = line (".")
+   let   l:type   = getline('.')
+   "---(determine header quality)------#
+   let   s:HTAG_shead   = "y"
+   if    (strpart (l:type, 77, 3) != "]*/")
+      let   s:HTAG_shead   = "-"
+   endif
+   if    (strpart (l:type, 62, 2) != " [")
+      let   s:HTAG_shead   = "-"
+   endif
+   if    (strpart (l:type, 53, 3) != "-[ ")
+      let   s:HTAG_shead   = "-"
+   endif
+   if    (strpart (l:type, 12, 6) != " /*-> ")
+      let   s:HTAG_shead   = "-"
+   endif
+   "---(determine title)---------------#
+   let   l:loc1   = match (l:type, "/[*]")
+   if    (l:loc1 >= 0)
+      let   s:HTAG_sprefix = strpart (l:type, 0, l:loc1 - 1)
+      let   l:loc1   = match   (l:type, "[A-Za-z0-9]", l:loc1 + 1)
+      let   l:loc2   = match   (l:type, "--", l:loc1 + 1) - 1
+      let   l:len    = l:loc2 - l:loc1
+      if    (l:len > 35)
+         let   l:len = 35
+      endi
+      let   s:HTAG_stitle  = strpart (l:type, l:loc1, l:len)
+   else
+      let   s:HTAG_shead   = "r"
+      let   s:HTAG_sprefix = strpart (l:type , 0, 12)
+   endi
+   "---(determine scope)---------------#
+   if    (match (g:HTAG_iden, "__unit") >  0)
+      let   s:HTAG_sscope  = "u"
+   elsei (match (g:HTAG_iden, "__test") >  0)
+      let   s:HTAG_sscope  = "u"
+   elsei (match (g:HTAG_iden, "__"    ) >  0)
+      let   s:HTAG_sscope  = "f"
+   elsei (match (l:type, "static")      == 0)
+      let   s:HTAG_sscope  = "s"
+   else
+      let   s:HTAG_sscope  = "g"
+   endi
+   "---(determine type)----------------#
+   if    (match (s:HTAG_sprefix, "char[*]")     >= 0)
+      let   s:HTAG_srv     = "s"
+   elsei (match (s:HTAG_sprefix, "char" )       >= 0)
+      let   s:HTAG_srv     = "c"
+   elsei (match (s:HTAG_sprefix, "[*]")         >= 0)
+      let   s:HTAG_srv     = "p"
+   else
+      let   s:HTAG_srv     = "v"
+   endi
+   "---(count params)------------------#
+   let   l:parms = len (split (l:recd, "\,")) - 1
+   if    (match (l:recd, "()") >  0)
+      let   s:HTAG_spsize = "0"
+   elsei (match (l:recd, "(void)") >  0)
+      let   s:HTAG_spsize = "0"
+   elsei (l:parms > 9)
+      let   s:HTAG_spsize = "#"
+   else
+      let   s:HTAG_spsize = l:parms + 1
+   endi
+   "---(mark bot)----------------------#
+   let   l:end = search ("^}$", "eW")
+   exec  "norm ".l:end."G"
+   norm  mz
+   "---(get to blank above function)---#
+   exec  "norm ".l:beg."G"
+   norm  k
+   "---(complete)-------------------------#
+   retu  0
+endf
+
+func HTAG_stats_size  ()
+   ""---(defense)------------------""
+   if    (s:HTAG_sscope == "-")
+      retu  0
+   endi
+   ""---(locals)-------------------""
+   let   l:file    = "htag.c"
+   ""---(write function out)-------------""
+   sil!  exec  ":'y,'zwrite! ".l:file
+   ""---(total size)---------------------""
+   sil!  exec   ".:!cat ".l:file." | wc -l"
+   let   l:total  = getline('.')
+   sil!  exec   ".:!grep \"^[ ]*$\" ".l:file." | wc -l"
+   let   l:empty  = getline('.')
+   if    (l:total >= 180)
+      let   s:HTAG_stsize = "#"
+   elsei (l:total <=   0)
+      let   s:HTAG_stsize = "0"
+   else
+      let   s:HTAG_stsize = strpart ("123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ", l:total / 5, 1)
+   endi
+   ""---(comments)-----------------------""
+   sil!  exec   ".:!grep \"^[ ]*[\/][*]\" ".l:file." | wc -l"
+   let   l:comm1  = getline('.')
+   sil!  exec   ".:!grep \"^[ ]*[*] \" ".l:file." | wc -l"
+   let   l:comm2  = getline('.')
+   let   l:comms  = l:comm1 + l:comm2 + l:empty
+   ""---(debugging)----------------------""
+   sil!  exec   ".:!grep \"^[ ]*DEBUG_\" ".l:file." | wc -l"
+   let   l:yurg   = getline('.')
+   sil!  exec   ".:!grep \"^[ ]*DEBUG_.*yLOG_\" ".l:file." | wc -l"
+   let   l:dlogs  = getline('.')
+   sil!  exec   ".:!grep \"yLOG_\" ".l:file." | wc -l"
+   let   l:ylogs  = getline('.')
+   let   l:debug  = l:dlogs + (l:ylogs - l:dlogs) + (l:yurg - l:dlogs)
+   if    (l:debug >= 180)
+      let   s:HTAG_sdsize = "#"
+   elsei (l:debug <=   0)
+      let   s:HTAG_sdsize = "0"
+   else
+      let   s:HTAG_sdsize = strpart ("123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ", l:debug  / 5, 1)
+   endi
+   ""---(slocl)--------------------------""
+   sil!  exec   ".:!cat ".l:file." | tr -cd \";\" | wc -c"
+   let   l:colon  = getline('.')
+   let   l:code   = l:total - l:comms - l:debug
+   let   l:slocl  = l:colon - l:debug
+   if    (l:slocl >= 180)
+      let   s:HTAG_sssize = "#"
+   elsei (l:slocl <=   0)
+      let   s:HTAG_sssize = "0"
+   else
+      let   s:HTAG_sssize = strpart ("123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ", l:slocl  / 5, 1)
+   endi
+   "---(complete)-------------------------#
+   retu  0
+endf
+
+func HTAG_stats_stat  ()
+   ""---(defense)------------------""
+   if    (s:HTAG_sscope == "-")
+      retu  0
+   endi
+   ""---(locals)-------------------""
+   let   l:file    = "htag.c"
+   ""---(returns)------------------""
+   sil!  exec   ".:!grep \" return \" ".l:file." | wc -l"
+   let   l:retns  = getline('.')
+   sil!  exec   ".:!grep \" rce \" ".l:file." | wc -l"
+   let   l:rced   = getline('.')
+   sil!  exec   ".:!grep \" return rce;\" ".l:file." | wc -l"
+   let   l:rces   = getline('.')
+   sil!  exec   ".:!grep \" return -(rce);\" ".l:file." | wc -l"
+   let   l:rcesn  = getline('.')
+   sil!  exec   ".:!grep \" return [0-9-]*;\" ".l:file." | wc -l"
+   let   l:retn2  = getline('.')
+   sil!  exec   ".:!grep \" return 0;\" ".l:file." | wc -l"
+   let   l:retnz  = getline('.')
+   if    (s:HTAG_srv  == "c")
+      if    (l:rces  > 0)
+         let   s:HTAG_srv     = "e"
+      elsei (l:rcesn > 0)
+         let   s:HTAG_srv     = "e"
+      elsei (l:rced  > 0)
+         let   s:HTAG_srv     = "e"
+      elsei (l:retns == 1 && l:retnz == 1)
+         let   s:HTAG_srv     = "z"
+      endi
+   endi
+   if    (l:retns == 0)
+      let   s:HTAG_srsize = "0"
+   elsei (l:retns >  9)
+      let   s:HTAG_srsize = "#"
+   else
+      let   s:HTAG_srsize = l:retns
+   endi
+   ""---(locals)-------------------""
+   sil!  exec   ".:!ctags -x --sort=no --c-kinds=l ".l:file." | wc -l"
+   let   l:local  = getline('.')
+   if    (l:local >= 36)
+      let   s:HTAG_slsize = "#"
+   elsei (l:local <=   0)
+      let   s:HTAG_slsize = "0"
+   else
+      let   s:HTAG_slsize = strpart ("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ", l:local, 1)
+   endi
+   ""---(func calls)---------------""
+   sil!  exec   ".:!cflow -d 2 ".l:file." | wc -l"
+   let   l:funca  = getline('.')
+   sil!  exec   ".:!cflow -d 2 ".l:file." | grep \"^[ ]*y\" | wc -l"
+   let   l:funcl  = getline('.')
+   sil!  exec   ".:!cflow -d 2 ".l:file." | grep \"^[ ]*yLOG\" | wc -l"
+   let   l:funcd  = getline('.')
+   sil!  exec   ".:!cflow -d 2 ".l:file." | grep \"^[ ]*[a-xz]\" | wc -l"
+   let   l:funcc  = getline('.')
+   let   l:funcs  = l:funca - l:funcd -l:funcc - 1
+   if    (l:funcs >= 36)
+      let   s:HTAG_sfsize = "#"
+   elsei (l:funcs <=   0)
+      let   s:HTAG_sfsize = "0"
+   else
+      let   s:HTAG_sfsize = strpart ("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ", l:funcs, 1)
+   endi
+   ""---(decisions)----------------""
+   sil!  exec   ".:!grep \" if[ ]*(\" ".l:file." | wc -l"
+   let   l:cif    = getline('.')
+   sil!  exec   ".:!grep \" else[ ]*if[ ]*(\" ".l:file." | wc -l"
+   let   l:celif  = getline('.')
+   sil!  exec   ".:!grep \" else \" ".l:file." | wc -l"
+   let   l:celse  = getline('.')
+   sil!  exec   ".:!grep \" switch[ ]*(\" ".l:file." | wc -l"
+   let   l:cswi   = getline('.')
+   sil!  exec   ".:!grep \" while[ ]*(\" ".l:file." | wc -l"
+   let   l:cwhi   = getline('.')
+   let   l:choos  = l:cif + (l:celse - l:celif) + l:cswi + l:cwhi
+   if    (l:choos >= 36)
+      let   s:HTAG_scsize = "#"
+   elsei (l:choos <=   0)
+      let   s:HTAG_scsize = "0"
+   else
+      let   s:HTAG_scsize = strpart ("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ", l:choos, 1)
+   endi
+   ""---(memory)-------------------""
+   sil!  exec   ".:!grep \" free[ ]*(\" ".l:file." | wc -l"
+   let   l:mfree  = getline('.')
+   sil!  exec   ".:!grep \" malloc[ ]*(\" ".l:file." | wc -l"
+   let   l:mmall  = getline('.')
+   sil!  exec   ".:!grep \" cmalloc[ ]*(\" ".l:file." | wc -l"
+   let   l:mcmall = getline('.')
+   sil!  exec   ".:!grep \" malloca[ ]*(\" ".l:file." | wc -l"
+   let   l:mamall = getline('.')
+   let   l:mem    = l:mfree + l:mmall + l:mcmall + l:mamall
+   if    (l:mem   >= 36)
+      let   s:HTAG_smsize = "#"
+   elsei (l:mem   <=   0)
+      let   s:HTAG_smsize = "0"
+   else
+      let   s:HTAG_smsize = strpart ("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ", l:mem  , 1)
+   endi
+   ""---(indent)-------------------""
+   let   s:HTAG_sisize = 0
+   sil!  exec   ".:!grep \"^      \" ".l:file." | wc -l"
+   let   l:inden = getline('.')
+   if    (l:inden > 0)
+      let   s:HTAG_sisize = 1
+   endi
+   sil!  exec   ".:!grep \"^         \" ".l:file." | wc -l"
+   let   l:inden = getline('.')
+   if    (l:inden > 0)
+      let   s:HTAG_sisize = 2
+   endi
+   sil!  exec   ".:!grep \"^            \" ".l:file." | wc -l"
+   let   l:inden = getline('.')
+   if    (l:inden > 0)
+      let   s:HTAG_sisize = 3
+   endi
+   sil!  exec   ".:!grep \"^               \" ".l:file." | wc -l"
+   let   l:inden = getline('.')
+   if    (l:inden > 0)
+      let   s:HTAG_sisize = 4
+   endi
+   sil!  exec   ".:!grep \"^                  \" ".l:file." | wc -l"
+   let   l:inden = getline('.')
+   if    (l:inden > 0)
+      let   s:HTAG_sisize = 5
+   endi
+   "---(complete)-------------------------#
+   retu  0
+endf
+
+func HTAG_stats_write ()
+   ""---(handle groups)------------------""
+   if    (s:HTAG_sscope == "-")
+      norm  ,t
+      norm  'x
+      if    (match (g:HTAG_iden, "o___") >= 0)
+         let   s:HTAG_sgroup   += 1
+         setl  modifiable
+         exec  ":norm  120|Rsr tsd plr cf mi "
+         setl  nomodifiable
+      else
+         let   s:HTAG_sbad     += 1
+      endi
+      retu  0
+   endif
+   let   s:HTAG_sgood    += 1
+   ""---(new header)---------------------""
+   if    (s:HTAG_shead == "-")
+      exec  ":norm  0DR".printf ("%-12.12s", s:HTAG_sprefix)." /*-> ------------------------------------[ ------ [--.---.---.--]*/"
+   elsei (s:HTAG_shead == "r")
+      norm  0D
+      norm  j
+      norm  0D
+      exec  ":norm  0DR".printf ("%-12.12s", s:HTAG_sprefix)." /*-> ------------------------------------[ ------ [--.---.---.--]*/"
+   else
+      norm  0D
+      norm  j
+   endi
+   exec  ":norm  19|R".s:HTAG_stitle." "
+   exec  ":norm  65|R".s:HTAG_sscope.s:HTAG_srv
+   exec  ":norm  68|R".s:HTAG_stsize.s:HTAG_sssize.s:HTAG_sdsize
+   exec  ":norm  72|R".s:HTAG_spsize.s:HTAG_slsize.s:HTAG_srsize
+   exec  ":norm  76|R".s:HTAG_scsize.s:HTAG_sfsize
+   ""---(update tag entry)---------------""
+   norm  ,t
+   norm  'x
+   setl  modifiable
+   exec  ":norm  120|R".s:HTAG_sscope.s:HTAG_srv."."
+   exec  ":norm  123|R".s:HTAG_stsize.s:HTAG_sssize.s:HTAG_sdsize."."
+   exec  ":norm  127|R".s:HTAG_spsize.s:HTAG_slsize.s:HTAG_srsize."."
+   exec  ":norm  131|R".s:HTAG_scsize.s:HTAG_sfsize."."
+   exec  ":norm  134|R".s:HTAG_smsize.s:HTAG_sisize."."
+   setl  nomodifiable
+   "---(complete)-------------------------#
+   retu  0
+endf
+
+func HTAG_stats_file  (bufno)
+   ""---(get the file name)-----------##
+   let   l:source = bufname (a:bufno)
+   let   l:loc    = match   (l:source, "[A-Za-z0-9_.]*$")
+   let   l:base   = strpart (l:source, l:loc)
+   let   l:loc    = match   (l:source, "[.][A-Za-z0-9_]*$")
+   let   l:ext    = strpart (l:source, l:loc)
+   ""---(skip non-c files)---------------""
+   let   s:HTAG_sfile   += 1
+   if (l:ext != ".c")
+      retu  0
+   endi
+   let   s:HTAG_scfile  += 1
    "---(mark top)-------------------------#
    norm  _
    let   l:top = search ("^".l:source,"cW")
-   if    l:top == 0 
-      echon "HTAG_stats ()         :: gyges_cell.c not found"
+   if    (l:top == 0)
       retu  0
    endif
    norm  mx
-   ""---(skip non-c files)---------------""
-   "let   l:loc    = match   (l:source, "[.][A-Za-z0-9_]*$")
-   "let   l:ext    = strpart (l:source, l:loc)
-   "if (l:ext != ".c")
-   "   retu  0
-   "endi
    ""---(find bottom)--------------------""
    norm  j
    let   l:bot = search ("   FILE$", "W") - 1
-   if    l:bot == -1
+   if    (l:bot == -1)
       norm  G
       let   l:bot = line('.')
    endif
    "---(find the functions)---------------#
    norm  'x
    if    (search ("^function (","W", l:bot) < 1)
-      echon "HTAG_stats ()         :: top = ".l:top.", bot = ".l:bot.", but no function header"
       retu  0
    endi 
    "---(parse the first)------------------#
    norm  mx
    norm  j
-   call  HTAG_parse()
+   call  HTAG_parse ()
    "---(walk the functions)---------------#
+   let   s:HTAG_sadjust  = 0
    while (g:HTAG_type == "function")
-      "---(initialize)--------------------#
-      let   l:scope   = "-"
-      let   l:rv      = "-"
-      let   l:tsize   = "-"
-      let   l:ssize   = "-"
-      let   l:dsize   = "-"
-      let   l:rsize   = "-"
-      let   l:psize   = "-"
-      let   l:csize   = "-"
-      let   l:msize   = "-"
-      let   l:lsize   = "-"
-      let   l:fsize   = "-"
-      let   l:title   = ""
-      let   l:prefix  = ""
-      "---(update and mark)---------------#
-      let   l:c += 1
+      ""---(mark)---------------------------""
+      let   s:HTAG_sfunc += 1
       norm  mx
-      "---(update and mark)---------------#
       norm  ,a
-      exec  "norm ".g:HTAG_line."G"
-      "redraw!
-      let   l:recd = getline('.')
-      if    (match (l:recd, g:HTAG_iden) == 0)
-         let   l:good += 1
-         "---(mark top)----------------------#
-         norm  k
-         norm  my
-         let   l:beg    = line (".")
-         "---(determine type)----------------#
-         let   l:type   = getline('.')
-         if    (match (l:type, "char[*]")     >= 0)
-            let   l:rv     = "s"
-         elsei (match (l:type, "char" )       >= 0)
-            let   l:rv     = "c"
-         else
-            let   l:rv     = "v"
-         endi
-         let   l:loc1   = match (l:type, "/[*]")
-         if    (l:loc1 >= 0)
-            let   l:prefix = strpart (l:type, 0, l:loc1 - 1)
-            let   l:loc1   = match   (l:type, "[A-Za-z0-9]", l:loc1 + 1)
-            let   l:loc2   = match   (l:type, "--", l:loc1 + 1) - 1
-            let   l:len    = l:loc2 - l:loc1
-            if    (l:len > 35)
-               let   l:len = 35
-            endi
-            let   l:title  = strpart (l:type, l:loc1, l:len)
-         else
-            let   l:prefix = strpart (l:type , 0, 12)
-         endi
-         "---(determine scope)---------------#
-         if    (match (g:HTAG_iden, "__unit") >  0)
-            let   l:scope  = "u"
-         elsei (match (g:HTAG_iden, "__"    ) >  0)
-            let   l:scope  = "f"
-         elsei (match (l:type, "static")      == 0)
-            let   l:scope  = "s"
-         else
-            let   l:scope  = "g"
-         endi
-         "---(count params)------------------#
-         let   l:parms = len (split (l:recd, "\,")) - 1
-         if    (match (l:recd, "()") >  0)
-            let   l:psize = "0"
-         elsei (match (l:recd, "(void)") >  0)
-            let   l:psize = "0"
-         elsei (l:parms > 9)
-            let   l:psize = "#"
-         else
-            let   l:psize = l:parms + 1
-         endi
-         "---(mark bot)----------------------#
-         let   l:end = search ("^}$", "eW")
-         exec  "norm ".l:end."G"
-         norm  mz
-         "echon "HTAG_stats ()         :: top = ".l:top.", bot = ".l:bot.", beg = ".l:beg.", end = ".l:end
-         "retu  0
-         "---(write to file)-----------------#
-         sil!  exec  ":'y,'zwrite! ".l:file
-         "---(get to blank above function)---#
-         exec  "norm ".l:beg."G"
-         norm  k
-         ""---(collect data)----------------##
-         sil!  exec   ".:!cat ".l:file." | wc -l"
-         let   l:total  = getline('.')
-         sil!  exec   ".:!grep \"^[ ]*$\" ".l:file." | wc -l"
-         let   l:empty  = getline('.')
-         if    (l:total >= 360)
-            let   l:tsize = "#"
-         elsei (l:total <=   0)
-            let   l:tsize = "0"
-         else
-            let   l:tsize = strpart ("123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ", l:total / 10, 1)
-         endi
-         ""---(comments)-----------------""
-         sil!  exec   ".:!grep \"^[ ]*[\/][*]\" ".l:file." | wc -l"
-         let   l:comm1  = getline('.')
-         sil!  exec   ".:!grep \"^[ ]*[*] \" ".l:file." | wc -l"
-         let   l:comm2  = getline('.')
-         let   l:comms  = l:comm1 + l:comm2 + l:empty
-         ""---(debugging)----------------""
-         sil!  exec   ".:!grep \"^[ ]*DEBUG_\" ".l:file." | wc -l"
-         let   l:yurg   = getline('.')
-         sil!  exec   ".:!grep \"^[ ]*DEBUG_.*yLOG_\" ".l:file." | wc -l"
-         let   l:dlogs  = getline('.')
-         sil!  exec   ".:!grep \"yLOG_\" ".l:file." | wc -l"
-         let   l:ylogs  = getline('.')
-         let   l:debug  = l:dlogs + (l:ylogs - l:dlogs) + (l:yurg - l:dlogs)
-         if    (l:debug >= 360)
-            let   l:dsize = "#"
-         elsei (l:debug <=   0)
-            let   l:dsize = "0"
-         else
-            let   l:dsize = strpart ("123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ", l:debug  / 10, 1)
-         endi
-         ""---(slocl)--------------------""
-         sil!  exec   ".:!cat ".l:file." | tr -cd \";\" | wc -c"
-         let   l:colon  = getline('.')
-         let   l:code   = l:total - l:comms - l:debug
-         let   l:slocl  = l:colon - l:debug
-         if    (l:slocl >= 360)
-            let   l:ssize = "#"
-         elsei (l:slocl <=   0)
-            let   l:ssize = "0"
-         else
-            let   l:ssize = strpart ("123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ", l:slocl  / 10, 1)
-         endi
-         ""---(returns)------------------""
-         sil!  exec   ".:!grep \" return \" ".l:file." | wc -l"
-         let   l:retns  = getline('.')
-         sil!  exec   ".:!grep \" rce \" ".l:file." | wc -l"
-         let   l:rced   = getline('.')
-         sil!  exec   ".:!grep \" return rce;\" ".l:file." | wc -l"
-         let   l:rces   = getline('.')
-         sil!  exec   ".:!grep \" return -(rce);\" ".l:file." | wc -l"
-         let   l:rcesn  = getline('.')
-         sil!  exec   ".:!grep \" return [0-9-]*;\" ".l:file." | wc -l"
-         let   l:retn2  = getline('.')
-         if    (l:rv  == "c")
-            if    (l:rces  > 0)
-               let   l:rv     = "e"
-            elsei (l:rcesn > 0)
-               let   l:rv     = "e"
-            elsei (l:rced  > 0)
-               let   l:rv     = "e"
-            endi
-         endi
-         if    (l:retns == 0)
-            let   l:rsize = "0"
-         elsei (l:retns >  9)
-            let   l:rsize = "#"
-         else
-            let   l:rsize = l:retns
-         endi
-         ""---(locals)-------------------""
-         sil!  exec   ".:!ctags -x --sort=no --c-kinds=l ".l:file." | wc -l"
-         let   l:local  = getline('.')
-         if    (l:local >= 36)
-            let   l:lsize = "#"
-         elsei (l:local <=   0)
-            let   l:lsize = "0"
-         else
-            let   l:lsize = strpart ("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ", l:local, 1)
-         endi
-         ""---(func calls)---------------""
-         sil!  exec   ".:!cflow -d 2 ".l:file." | wc -l"
-         let   l:funca  = getline('.')
-         sil!  exec   ".:!cflow -d 2 ".l:file." | grep \"^[ ]*y\" | wc -l"
-         let   l:funcl  = getline('.')
-         sil!  exec   ".:!cflow -d 2 ".l:file." | grep \"^[ ]*yLOG\" | wc -l"
-         let   l:funcd  = getline('.')
-         sil!  exec   ".:!cflow -d 2 ".l:file." | grep \"^[ ]*[a-xz]\" | wc -l"
-         let   l:funcc  = getline('.')
-         let   l:funcs  = l:funca - l:funcd -l:funcc - 1
-         if    (l:funcs >= 36)
-            let   l:fsize = "#"
-         elsei (l:funcs <=   0)
-            let   l:fsize = "0"
-         else
-            let   l:fsize = strpart ("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ", l:funcs, 1)
-         endi
-         ""---(decisions)----------------""
-         sil!  exec   ".:!grep \" if[ ]*(\" ".l:file." | wc -l"
-         let   l:cif    = getline('.')
-         sil!  exec   ".:!grep \" else[ ]*if[ ]*(\" ".l:file." | wc -l"
-         let   l:celif  = getline('.')
-         sil!  exec   ".:!grep \" else \" ".l:file." | wc -l"
-         let   l:celse  = getline('.')
-         sil!  exec   ".:!grep \" switch[ ]*(\" ".l:file." | wc -l"
-         let   l:cswi   = getline('.')
-         sil!  exec   ".:!grep \" while[ ]*(\" ".l:file." | wc -l"
-         let   l:cwhi   = getline('.')
-         let   l:choos  = l:cif + (l:celse - l:celif) + l:cswi + l:cwhi
-         if    (l:choos >= 36)
-            let   l:csize = "#"
-         elsei (l:choos <=   0)
-            let   l:csize = "0"
-         else
-            let   l:csize = strpart ("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ", l:choos, 1)
-         endi
-         ""---(memory)-------------------""
-         sil!  exec   ".:!grep \" free[ ]*(\" ".l:file." | wc -l"
-         let   l:mfree  = getline('.')
-         sil!  exec   ".:!grep \" malloc[ ]*(\" ".l:file." | wc -l"
-         let   l:mmall  = getline('.')
-         sil!  exec   ".:!grep \" cmalloc[ ]*(\" ".l:file." | wc -l"
-         let   l:mcmall = getline('.')
-         let   l:mem    = l:mfree + l:mmall + l:mcmall
-         if    (l:mem   >= 36)
-            let   l:msize = "#"
-         elsei (l:mem   <=   0)
-            let   l:msize = "0"
-         else
-            let   l:msize = strpart ("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ", l:mem  , 1)
-         endi
-         ""---(summary)------------------""
-         exec  ":norm  0DR".printf ("%-12.12s", l:prefix)." /*-> ------------------------------------[ ------ [--.---.---.--]*/"
-         exec  ":norm  19|R".l:title." "
-         exec  ":norm  65|R".l:scope.l:rv
-         exec  ":norm  68|R".l:tsize.l:ssize.l:dsize
-         exec  ":norm  72|R".l:psize.l:lsize.l:rsize
-         exec  ":norm  76|R".l:csize.l:fsize
-         "norm  0D
-      else
-         let   l:bad  += 1
-      endi
-      "---(go to next function)-----------#
-      norm  ,t
-      norm  'x
-      setl  modifiable
-      exec  ":norm  120|R".l:scope.l:rv
-      exec  ":norm  122|R".l:tsize.l:ssize.l:dsize
-      exec  ":norm  125|R".l:psize.l:lsize.l:rsize
-      exec  ":norm  128|R".l:csize.l:fsize.l:msize
-      setl  nomodifiable
-      "sleep 100m
+      call  HBUF_goto (l:source)
+      call  HTAG_stats_head  ()           
+      call  HTAG_stats_size  ()           
+      call  HTAG_stats_stat  ()           
+      call  HTAG_stats_write ()           
       norm  0j
-      call  HTAG_parse()
-      "---(done)--------------------------#
+      call  HTAG_parse       ()
    endw
-   "---(final status)---------------------#
-   if    (l:c <= 0)
-      echon "HTAG_stats ()         :: top = ".l:top.", bot = ".l:bot.", but no functions found (".g:HTAG_type.")"
-      retu  0
-   endi
-   echon "HTAG_stats ()         :: top = ".l:top.", bot = ".l:bot.", cnt = ".l:c.", good = ".l:good.", bad = ".l:bad
    "---(complete)-------------------------#
    retu  0
 endf
+
+func HTAG_stats_full  ()
+   ""---(clear stats)------+-----+-----+-""
+   let   s:HTAG_sfile      = 0
+   let   s:HTAG_scfile     = 0
+   let   s:HTAG_sfunc      = 0
+   let   s:HTAG_sgood      = 0
+   let   s:HTAG_sgroup     = 0
+   let   s:HTAG_sbad       = 0
+   ""---(first file)---------------------""
+   let   l:bufno           = HBUF_next (0)
+   ""---(run each file)------------------""
+   while (l:bufno > 0)
+      call  HTAG_stats_file (l:bufno)
+      let   l:bufno = HBUF_next (l:bufno)
+   endw
+   ""---(final status)-------------------""
+   echon "HTAG_stats ()         :: files=".s:HTAG_sfile.", procd=".s:HTAG_scfile.", funcs=".s:HTAG_sfunc.", good =".s:HTAG_sgood.", group=".s:HTAG_sgroup.", bad  =".s:HTAG_sbad
+   sil!  exec  ":write! htag.tags"
+   norm  ,a
+   ""---(complete)-----------------------""
+   retu  0
+endf
+
 
 
 
