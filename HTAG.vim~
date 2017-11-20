@@ -276,15 +276,15 @@ function! HTAG_hints()       " PURPOSE : move to a specific hint/tag
       return -1
    endif
    "---(identify the handler)-----------------#
-   if    tag_id >= "aa"
+   if    (match (l:tag_id, "[a-z][A-Za-z]") >= 0)
       echon "  (normal ctag) processing..."
-   elsei tag_id >= "MA"
-      echon "  (HCSC/cscope/grep tag) processing..."
-      call HCSC_hints(l:tag_id)
-      return
-   elsei tag_id >= "AA"
+   elsei (match (l:tag_id, "[A-L][A-Za-z]") >= 0)
       echon "  (HFIX/quickfix tag) processing..."
       call HFIX_hints(l:tag_id)
+      return
+   elsei (match (l:tag_id, "[M-Z][A-Za-z]") >= 0)
+      echon "  (HCSC/cscope/grep tag) processing..."
+      call HCSC_hints(l:tag_id)
       return
    endif
    "---(switch to tag window)-----------------#
@@ -839,6 +839,8 @@ let   s:HTAG_sfsize   = "-"
 let   s:HTAG_sisize   = "-"
 let   s:HTAG_sGsize   = "-"
 let   s:HTAG_sLsize   = "-"
+let   s:HTAG_sDsize   = "-"
+let   s:HTAG_sUsize   = "-"
 let   s:HTAG_sadjust  = 0
 
 func HTAG_stats_prep  ()
@@ -864,27 +866,33 @@ func HTAG_stats_prep  ()
    let   s:HTAG_sisize   = "-"
    let   s:HTAG_sGsize   = "-"
    let   s:HTAG_sLsize   = "-"
+   let   s:HTAG_sDsize   = "-"
+   let   s:HTAG_sUsize   = "-"
    retu  0
 endf
 
 func HTAG_stats_check ()
    let   l:type   = getline('.')
    if    (strpart (l:type, 77, 3) != "]*/")
+      echon "-1"
       retu  -1
    endif
    if    (strpart (l:type, 62, 2) != " [")
+      echon "-2"
       retu  -2
    endif
    if    (strpart (l:type, 53, 3) != "-[ ")
+      echon "-3"
       retu  -3
    endif
    if    (strpart (l:type, 12, 6) != " /*-> ")
+      echon "-4"
       retu  -4
    endif
    retu  0
 endf
 
-func HTAG_stats_head  ()
+func HTAG_stats_head_srp  ()
    ""---(check function)-----------------""
    exec  "norm ".(g:HTAG_line + s:HTAG_sadjust)."G"
    redraw!
@@ -970,7 +978,7 @@ func HTAG_stats_head  ()
    retu  0
 endf
 
-func HTAG_stats_size  ()
+func HTAG_stats_size_tsd  ()
    ""---(defense)------------------""
    if    (s:HTAG_sscope == "-")
       retu  0
@@ -1028,7 +1036,7 @@ func HTAG_stats_size  ()
    retu  0
 endf
 
-func HTAG_stats_stat  ()
+func HTAG_stats_stat_rlf   ()
    ""---(defense)------------------""
    if    (s:HTAG_sscope == "-")
       retu  0
@@ -1093,6 +1101,17 @@ func HTAG_stats_stat  ()
    else
       let   s:HTAG_sfsize = strpart ("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ", l:funcs, 1)
    endi
+   "---(complete)-------------------------#
+   retu  0
+endf
+
+func HTAG_stats_stat_cmi   ()
+   ""---(defense)------------------""
+   if    (s:HTAG_sscope == "-")
+      retu  0
+   endi
+   ""---(locals)-------------------""
+   let   l:file    = "HTAG.c"
    ""---(decisions)----------------""
    sil!  exec   ".:!grep \" if[ ]*(\" ".l:file." | wc -l"
    let   l:cif    = getline('.')
@@ -1129,6 +1148,44 @@ func HTAG_stats_stat  ()
    else
       let   s:HTAG_smsize = strpart ("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ", l:mem  , 1)
    endi
+   ""---(indent)-------------------""
+   let   s:HTAG_sisize = 0
+   sil!  exec   ".:!grep \"^      \" ".l:file." | wc -l"
+   let   l:inden = getline('.')
+   if    (l:inden > 0)
+      let   s:HTAG_sisize = 1
+   endi
+   sil!  exec   ".:!grep \"^         \" ".l:file." | wc -l"
+   let   l:inden = getline('.')
+   if    (l:inden > 0)
+      let   s:HTAG_sisize = 2
+   endi
+   sil!  exec   ".:!grep \"^            \" ".l:file." | wc -l"
+   let   l:inden = getline('.')
+   if    (l:inden > 0)
+      let   s:HTAG_sisize = 3
+   endi
+   sil!  exec   ".:!grep \"^               \" ".l:file." | wc -l"
+   let   l:inden = getline('.')
+   if    (l:inden > 0)
+      let   s:HTAG_sisize = 4
+   endi
+   sil!  exec   ".:!grep \"^                  \" ".l:file." | wc -l"
+   let   l:inden = getline('.')
+   if    (l:inden > 0)
+      let   s:HTAG_sisize = 5
+   endi
+   "---(complete)-------------------------#
+   retu  0
+endf
+
+func HTAG_stats_stat_nog0  ()
+   ""---(defense)------------------""
+   if    (s:HTAG_sscope == "-")
+      retu  0
+   endi
+   ""---(locals)-------------------""
+   let   l:file    = "HTAG.c"
    ""---(ncurses output)-----------""
    sil!  exec   ".:!grep \" mvprintw[ ]*(\" ".l:file." | wc -l"
    let   l:ncursp = getline('.')
@@ -1191,6 +1248,17 @@ func HTAG_stats_stat  ()
    else
       let   s:HTAG_s0size = strpart ("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ", l:read    , 1)
    endi
+   "---(complete)-------------------------#
+   retu  0
+endf
+
+func HTAG_stats_stat_GLD   ()
+   ""---(defense)------------------""
+   if    (s:HTAG_sscope == "-")
+      retu  0
+   endi
+   ""---(locals)-------------------""
+   let   l:file    = "HTAG.c"
    ""---(callers)------------------""
    sil!  exec   ".:!HTAG_call.awk -v g_func=".g:HTAG_iden." < HTAG.lcalls"
    let   l:lcalls = getline('.')
@@ -1210,32 +1278,49 @@ func HTAG_stats_stat  ()
    else
       let   s:HTAG_sGsize = strpart ("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ", l:gcalls   , 1)
    endi
-   ""---(indent)-------------------""
-   let   s:HTAG_sisize = 0
-   sil!  exec   ".:!grep \"^      \" ".l:file." | wc -l"
-   let   l:inden = getline('.')
-   if    (l:inden > 0)
-      let   s:HTAG_sisize = 1
+   ""---(call depth)---------------""
+   sil!  exec   ":!grep \"".g:HTAG_iden."\" HTAG.flow > HTAG.mydepth"
+   let   l:prefix         = ""
+   let   l:level          =  0
+   let   l:depth          = -1
+   while (l:depth < 0 && l:level < 36)
+      sil!  exec   ".:!grep \"^".l:prefix.g:HTAG_iden."\" HTAG.mydepth | wc -l"
+      let   l:inden = getline('.')
+      if    (l:inden > 0)
+         let   l:depth = l:level
+      endi
+      let   l:level  += 1
+      let   l:prefix  = printf ("%s    ", l:prefix)
+   endw
+   if    (l:depth   <   0)
+      let   s:HTAG_sDsize = "#"
+   else
+      let   s:HTAG_sDsize = strpart ("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ", l:depth    , 1)
    endi
-   sil!  exec   ".:!grep \"^         \" ".l:file." | wc -l"
-   let   l:inden = getline('.')
-   if    (l:inden > 0)
-      let   s:HTAG_sisize = 2
+   "---(complete)-------------------------#
+   retu  0
+endf
+
+func HTAG_stats_stat_U     ()
+   ""---(defense)------------------""
+   if    (s:HTAG_sscope == "-")
+      retu  0
    endi
-   sil!  exec   ".:!grep \"^            \" ".l:file." | wc -l"
-   let   l:inden = getline('.')
-   if    (l:inden > 0)
-      let   s:HTAG_sisize = 3
-   endi
-   sil!  exec   ".:!grep \"^               \" ".l:file." | wc -l"
-   let   l:inden = getline('.')
-   if    (l:inden > 0)
-      let   s:HTAG_sisize = 4
-   endi
-   sil!  exec   ".:!grep \"^                  \" ".l:file." | wc -l"
-   let   l:inden = getline('.')
-   if    (l:inden > 0)
-      let   s:HTAG_sisize = 5
+   ""---(unit test)----------------""
+   let   s:HTAG_sUsize = "!"
+   sil!  exec   ".:!ls *.unit 2> /dev/null | wc -l"
+   let   l:units  = getline('.')
+   if    (l:units > 0)
+      let   l:target    = printf (" %-20.20s ", g:HTAG_iden)
+      sil!  exec   ".:!grep \"".l:target."\" *.unit | wc -l"
+      let   l:units  = getline('.')
+      if    (l:units   >= 36)
+         let   s:HTAG_sUsize = "#"
+      elsei (l:units   <=   0)
+         let   s:HTAG_sUsize = "!"
+      else
+         let   s:HTAG_sUsize = strpart ("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ", l:units    , 1)
+      endi
    endi
    "---(complete)-------------------------#
    retu  0
@@ -1287,13 +1372,14 @@ func HTAG_stats_write ()
    else
       exec  ":norm  57|R".printf ("%-6.6s",s:HTAG_sclass)." "
    endi
-   exec  ":norm  65|R".s:HTAG_sscope.s:HTAG_srv
-   exec  ":norm  68|R".s:HTAG_stsize.s:HTAG_sssize.s:HTAG_sdsize
-   exec  ":norm  72|R".s:HTAG_spsize.s:HTAG_slsize.s:HTAG_srsize
+   exec  ":norm  65|R".s:HTAG_sscope.s:HTAG_srv."."
+   exec  ":norm  68|R".s:HTAG_stsize.s:HTAG_sssize.s:HTAG_sdsize."."
+   exec  ":norm  72|R".s:HTAG_spsize.s:HTAG_slsize.s:HTAG_srsize."."
    exec  ":norm  76|R".s:HTAG_scsize.s:HTAG_sfsize
-   exec  ":norm  86|R".s:HTAG_smsize.s:HTAG_sisize
-   exec  ":norm  89|R".s:HTAG_snsize.s:HTAG_sosize.s:HTAG_sgsize.s:HTAG_s0size
-   exec  ":norm  94|R".s:HTAG_sGsize.s:HTAG_sLsize
+   exec  ":norm  86|R".s:HTAG_smsize.s:HTAG_sisize."."
+   exec  ":norm  89|R".s:HTAG_snsize.s:HTAG_sosize.s:HTAG_sgsize.s:HTAG_s0size."."
+   exec  ":norm  94|R".s:HTAG_sGsize.s:HTAG_sLsize.s:HTAG_sDsize."."
+   exec  ":norm  98|R".s:HTAG_sUsize
    "---(complete)-------------------------#
    retu  0
 endf
@@ -1346,7 +1432,9 @@ func HTAG_stats_read  ()
    let   s:HTAG_sgsize  = strpart (l:recd, 90, 1)
    let   s:HTAG_s0size  = strpart (l:recd, 91, 1)
    let   s:HTAG_sGsize  = strpart (l:recd, 93, 1)
-   let   s:HTAG_sLsize  = strpart (l:recd, 93, 1)
+   let   s:HTAG_sLsize  = strpart (l:recd, 94, 1)
+   let   s:HTAG_sDsize  = strpart (l:recd, 95, 1)
+   let   s:HTAG_sUsize  = strpart (l:recd, 97, 1)
    ""---(complete)-----------------------""
    retu  0
 endf
@@ -1361,7 +1449,7 @@ func HTAG_stats_tag   ()
       if    (match (g:HTAG_iden, "o___") >= 0)
          let   s:HTAG_sgroup   += 1
          exec  ":norm  93|Rgroup     "
-         exec  ":norm  120|R sr tsd plr cf   mi nog0 -- --   -- --- --- -- "
+         exec  ":norm  120|R sr tsd plr cf   mi nog0 GLD U   -- --- --- -- "
       else
          let   s:HTAG_sbad     += 1
       endi
@@ -1379,7 +1467,8 @@ func HTAG_stats_tag   ()
       exec  ":norm  136|R["
       exec  ":norm  137|R".s:HTAG_smsize.s:HTAG_sisize."."
       exec  ":norm  140|R".s:HTAG_snsize.s:HTAG_sosize.s:HTAG_sgsize.s:HTAG_s0size."."
-      exec  ":norm  145|R".s:HTAG_sGsize.s:HTAG_sLsize."."
+      exec  ":norm  145|R".s:HTAG_sGsize.s:HTAG_sLsize.s:HTAG_sDsize."."
+      exec  ":norm  149|R".s:HTAG_sUsize."]"
       ""---(title and type)--------------""
       exec  ":norm  241|R".s:HTAG_stitle
       exec  ":norm  288|R".s:HTAG_sclass
@@ -1404,7 +1493,7 @@ func HTAG_stats_file  (action, bufno)
    let   s:HTAG_scfile  += 1
    ""---(prepare local flow)-------------""
    if    (a:action == "w")
-      sil!  exec ":!cflow -r -d 2 ".l:source." > HTAG.lcalls"
+      sil!  exec ":!cflow -r -d 2 ".l:source." 2> /dev/null > HTAG.lcalls"
       redraw!
    endi
    "---(mark top)-------------------------#
@@ -1445,11 +1534,15 @@ func HTAG_stats_file  (action, bufno)
       endi
       ""---(write)--------------------------""
       if    (a:action == "w")
-         call  HTAG_stats_head  ()           
-         call  HTAG_stats_size  ()           
-         call  HTAG_stats_stat  ()           
-         call  HTAG_stats_class ()           
-         call  HTAG_stats_write ()           
+         call  HTAG_stats_head_srp  ()           
+         call  HTAG_stats_size_tsd  ()           
+         call  HTAG_stats_stat_rlf  ()           
+         call  HTAG_stats_stat_cmi  ()           
+         call  HTAG_stats_stat_nog0 ()           
+         call  HTAG_stats_stat_GLD  ()           
+         call  HTAG_stats_stat_U    ()           
+         call  HTAG_stats_class     ()           
+         call  HTAG_stats_write     ()           
       endi
       ""---(common)-------------------------""
       call  HTAG_stats_tag   ()           
@@ -1470,7 +1563,9 @@ func HTAG_stats_full  (action)
    let   s:HTAG_sbad       = 0
    ""---(prepare global flow)------------""
    if    (a:action == "w")
-      sil!  exec ":!cflow -r -d 2 *.c > HTAG.gcalls"
+      sil!  exec ":!make clean"
+      sil!  exec ":!cflow -r -d 2 *.c 2> /dev/null > HTAG.gcalls"
+      sil!  exec ":!cflow -d 150  *.c 2> /dev/null > HTAG.flow"
       redraw!
    endi
    ""---(first file)---------------------""
@@ -1484,6 +1579,7 @@ func HTAG_stats_full  (action)
    echon "HTAG_stats ()         :: files=".s:HTAG_sfile.", procd=".s:HTAG_scfile.", funcs=".s:HTAG_sfunc.", good =".s:HTAG_sgood.", group=".s:HTAG_sgroup.", bad  =".s:HTAG_sbad
    sil!  exec  ":write! HTAG.tags"
    norm  ,a
+   redraw!
    ""---(complete)-----------------------""
    retu  0
 endf
