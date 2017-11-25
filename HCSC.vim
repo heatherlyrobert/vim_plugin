@@ -356,7 +356,7 @@ endf
 " parms   : search type
 " exit    : single point (plus defense) with simple numeric error code
 func!  HCSC_search(type)
-   if    bufwinnr(g:htag_title) < 1
+   if    bufwinnr(g:HTAG_title) < 1
       echon "HCSC_search()      :: tag window must be open (returning)..."
       retu
    endif

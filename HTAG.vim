@@ -1613,6 +1613,9 @@ func HTAG_stats_full  (action)
    echon "HTAG_stats ()         :: files=".s:HTAG_sfile.", procd=".s:HTAG_scfile.", funcs=".s:HTAG_sfunc.", good =".s:HTAG_sgood.", group=".s:HTAG_sgroup.", bad  =".s:HTAG_sbad
    sil!  exec  ":write! HTAG.tags"
    sil!  exec  ":!HTAG_gyges.awk < HTAG.tags > HTAG.gyges"
+   sil!  exec  ":!grep \"^[a-z][A-Za-z]  [A-Za-z][A-Za-z]\" HTAG.tags    > HTAG.asterion"
+   sil!  exec  ":!printf \"\\\n\"                                       >> HTAG.asterion"
+   sil!  exec  ":!cat  HTAG.flow                                        >> HTAG.asterion"
    norm  ,a
    redraw!
    ""---(complete)-----------------------""

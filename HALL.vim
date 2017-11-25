@@ -50,7 +50,7 @@ func!  HALL_lock()
    let   g:hbuf_locked      = "y"
    let   g:hcsc_locked      = "y"
    let   g:hfix_locked      = "y"
-   let   g:htag_locked      = "y"
+   let   g:HTAG_locked      = "y"
    retu
 endf
 
@@ -60,7 +60,7 @@ func!  HALL_unlock()
    let   g:hbuf_locked      = "n"
    let   g:hcsc_locked      = "n"
    let   g:hfix_locked      = "n"
-   let   g:htag_locked      = "n"
+   let   g:HTAG_locked      = "n"
    retu
 endf
 

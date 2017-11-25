@@ -455,7 +455,7 @@ endf
 
 
 func! HFIX_compile(std)
-   if    bufwinnr(g:htag_title) < 1
+   if    bufwinnr(g:HTAG_title) < 1
       echon "HFIX_compile()           :: tag window must be open (returning)..."
       retu
    endi
