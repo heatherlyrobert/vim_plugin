@@ -1,2 +1,2 @@
-#define    VER_NUM "1.5p"
-#define    VER_TXT "HTAG_stats broke out stats calcs for dedugging ease"
+#define    VER_NUM "1.5r"
+#define    VER_TXT "added rough HTAG file and function updates"

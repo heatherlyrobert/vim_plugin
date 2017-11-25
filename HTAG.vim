@@ -47,9 +47,10 @@
 
 
 "---(general)------------------------------------#
-let g:htag_title    = "HTAG_buffer"
-let g:htag_locked   = "n"
+let g:HTAG_title    = "HTAG_buffer"
+let g:HTAG_locked   = "n"
 let g:HTAG_times    = 0
+let g:HTAG_cword    = "---"
 
 "---(current tag)--------------------------------#
 let s:HTAG_tagn     = ""
@@ -57,6 +58,7 @@ let s:HTAG_line     = 0
 let s:HTAG_file     = ""
 let s:HTAG_type     = ""
 let s:HTAG_stat     = ""
+let s:HTAG_class    = ""
 let s:HTAG_iden     = ""
 
 "---(function cursor)----------------------------#
@@ -91,7 +93,7 @@ endf
 
 ""=[[ main setup driver ]]================================[ root   [ 113n0s ]=##
 func! HTAG_init ()
-   sil!  exec 'vert split '.g:htag_title
+   sil!  exec 'vert split '.g:HTAG_title
    setl  modifiable
    call  HALL_start  ()
    call  HTAG_syntax ()
@@ -123,12 +125,14 @@ endf
 
 ""=[[ establish buffer specific key mapping ]]============[ leaf   [ 110n0x ]=##
 func! HTAG_keys ()
-   nmap           ,t  :call HTAG_show    ()<cr>
+   nmap           ,t  :call HTAG_show    (expand("<cword>"))<cr>
    nnor           ;;  :call HTAG_hints   ()<cr>
    nmap  <buffer> t   :call HTAG_update  ()<cr>
    nmap  <buffer> h   :call HTAG_hide    ()<cr>
    nmap  <buffer> s   :call HTAG_stats_full  ("r")<cr>
    nmap  <buffer> S   :call HTAG_stats_full  ("w")<cr>
+   nmap  <buffer> f   :call HTAG_stats_full  ("f")<cr>
+   nmap  <buffer> c   :call HTAG_stats_full  ("c")<cr>
    retu
 endf
 
@@ -168,19 +172,19 @@ endf
 
 "===[[ ROOT   ]]==> simplified interface for starting up vim from CLI w/"-c"
 function! HTAG_on()
-   call HTAG_show()
+   call HTAG_show("")
    call HTAG_update()
 endfunction
 
 
 ""=[[ display the tag window ]]===========================[ twig   [ 433y6s ]=##
-func! HTAG_show ()
+func! HTAG_show (cword)
    ""---(locals)-----------+-----------+-##
    let   l:prefix    = "HTAG_show"
    let   l:rce       = -10
    ""---(defense : no recursion)---------##
    let   l:rce -= 1
-   if    (g:htag_locked == "y")
+   if    (g:HTAG_locked == "y")
       call  HALL_message (l:prefix, "htag is locked", l:rce)
       retu  l:rce
    endi
@@ -192,9 +196,10 @@ func! HTAG_show ()
    endi
    ""---(lock her down)------------------##
    let   g:hbuf_locked = "y"
-   let   g:htag_locked = "y"
+   let   g:HTAG_locked = "y"
+   let   g:HTAG_cword  = a:cword
    ""---(verify the buffer)--------------##
-   let   l:tag_buf = bufnr (g:htag_title)
+   let   l:tag_buf = bufnr (g:HTAG_title)
    if    (l:tag_buf < 1)
       call  HTAG_init ()
    endi
@@ -205,7 +210,7 @@ func! HTAG_show ()
       hide
    endi
    ""---(position it properly)-----------##
-   sil!  exec 'vert split '.g:htag_title
+   sil!  exec 'vert split '.g:HTAG_title
    vert  resize 20
    ""---(activate the repositioning)-----##
    call  HTAG_auto_on()
@@ -213,7 +218,7 @@ func! HTAG_show ()
    norm  zt
    ""---(let her go)---------------------##
    let   g:hbuf_locked = "n"
-   let   g:htag_locked = "n"
+   let   g:HTAG_locked = "n"
    ""---(complete)-----------------------##
    call  HALL_message (l:prefix, "complete.", 0)
    retu  0
@@ -288,7 +293,7 @@ function! HTAG_hints()       " PURPOSE : move to a specific hint/tag
       return
    endif
    "---(switch to tag window)-----------------#
-   let    l:win_num = HBUF_by_name(g:htag_title)
+   let    l:win_num = HBUF_by_name(g:HTAG_title)
    if (l:win_num != -1)
       silent exec l:win_num.' wincmd w'
    endif
@@ -305,15 +310,15 @@ function! HTAG_hints()       " PURPOSE : move to a specific hint/tag
    "---(highlight the tag)--------------------#
    silent exec "silent! syntax clear rsh_tag_identifier"
    silent exec "hi link rsh_tag_identifier function"
-   silent exec "syntax match rsh_tag_identifier ' " . g:HTAG_iden . " ' containedin=ALL"
+   silent exec "syntax match rsh_tag_identifier ' " . s:HTAG_iden . " ' containedin=ALL"
    "---(get back to the original window)------#
    let l:rc = HBUF_restore()
    if l:rc < 1
       return -1
    endif
    "---(get to the right buffer)--------------#
-   if bufname('%') != g:HTAG_file
-      let l:buf_num = bufnr(g:HTAG_file)
+   if bufname('%') != s:HTAG_file
+      let l:buf_num = bufnr(s:HTAG_file)
       if (l:buf_num == -1)
          echo "HTAG_hints() :: buffer not open in wim..."
          return
@@ -323,9 +328,9 @@ function! HTAG_hints()       " PURPOSE : move to a specific hint/tag
    endif
    "---(get to the right line)----------------# make sure to show comments above
    silent exec ":norm  _"
-   "silent! exec ":normal ".(g:HTAG_line - 1). "j"
-   silent! exec ":".g:HTAG_line
-   if g:HTAG_type == "function"
+   "silent! exec ":normal ".(s:HTAG_line - 1). "j"
+   silent! exec ":".s:HTAG_line
+   if s:HTAG_type == "function"
       silent exec "normal {j"
    endif
    silent exec "normal zt"
@@ -344,7 +349,7 @@ endfunction
 "===[ PETAL  ]===> adjust tag display when buffers change <====================#
 function! HTAG_change()
    "---(do not allow recursion)------------------#
-   if    (g:htag_locked == "y")
+   if    (g:HTAG_locked == "y")
       retu
    endi
    "---(save working win/buf/loc)----------------#
@@ -352,12 +357,12 @@ function! HTAG_change()
       return
    endif
    "---(find the tags window)--------------------#
-   if (HBUF_by_name(g:htag_title) < 1)
+   if (HBUF_by_name(g:HTAG_title) < 1)
       return
    endif
    "---(lock her down)---------------------------#
    let  g:hbuf_locked = "y"
-   let  g:htag_locked = "y"
+   let  g:HTAG_locked = "y"
    silent! exec l:tag_win.' wincmd w'
    "---(go to the right place)-------------------"
    norm  _
@@ -367,7 +372,7 @@ function! HTAG_change()
    "---(go back to working win/buf/loc)----------#
    call HBUF_restore()
    "---(let her go)------------------------------#
-   let  g:htag_locked = "n"
+   let  g:HTAG_locked = "n"
    let  g:hbuf_locked = "n"
    "---(complete)--------------------------------#
    return
@@ -378,17 +383,17 @@ endfunction
 "===[ PETAL  ]===> create tag list for all active buffers <====================#
 function! HTAG_update()
    "---(do not allow recursion)------------------#
-   if (g:htag_locked == "y")
+   if (g:HTAG_locked == "y")
       retu
    endif
    "---(start locked code)-----------------------#
    let  g:hbuf_locked = "y"
-   let  g:htag_locked = "y"
+   let  g:HTAG_locked = "y"
    "---(run)-------------------------------------#
    let  g:HTAG_times  += 1
    call HTAG_list_BUFSONLY()
    "---(unlock code)-----------------------------#
-   let  g:htag_locked = "n"
+   let  g:HTAG_locked = "n"
    let  g:hbuf_locked = "n"
    "---(return to previous window)---------------#
    call HBUF_restore()
@@ -633,34 +638,38 @@ endfunction
 
 function! HTAG_parse()
    "---(initialize)------------------------------#
-   let  g:HTAG_tagn    = ""
-   let  g:HTAG_line    = 0
-   let  g:HTAG_file    = ""
-   let  g:HTAG_type    = ""
-   let  g:HTAG_stat    = ""
-   let  g:HTAG_iden    = ""
+   let  s:HTAG_tagn    = ""
+   let  s:HTAG_line    = 0
+   let  s:HTAG_file    = ""
+   let  s:HTAG_type    = ""
+   let  s:HTAG_stat    = ""
+   let  s:HTAG_iden    = ""
+   let  s:HTAG_iden    = ""
    "---(check for null)--------------------------#
    let  l:full_line = getline('.')
    if (l:full_line == "")
       return 0
    endif
    "---(tag number)------------------------------#
-   let  g:HTAG_tagn    = strpart    (l:full_line, 0, 2)
+   let  s:HTAG_tagn    = strpart    (l:full_line, 0, 2)
    "---(line number)-----------------------------#
-   let  g:HTAG_line    = matchstr   (l:full_line, "  #1#  .*  #2#  ")
-   let  g:HTAG_line    = substitute (strpart (g:HTAG_line, 7, strlen (g:HTAG_line) - 14), " ", "", "g")
+   let  s:HTAG_line    = matchstr   (l:full_line, "  #1#  .*  #2#  ")
+   let  s:HTAG_line    = substitute (strpart (s:HTAG_line , 7, strlen (s:HTAG_line ) - 14), " ", "", "g")
    "---(file name)-------------------------------#
-   let  g:HTAG_file    = matchstr   (l:full_line, "  #2#  .*  #3#  ")
-   let  g:HTAG_file    = substitute (strpart (g:HTAG_file, 7, strlen (g:HTAG_file) - 14), " ", "", "g")
+   let  s:HTAG_file    = matchstr   (l:full_line, "  #2#  .*  #3#  ")
+   let  s:HTAG_file    = substitute (strpart (s:HTAG_file , 7, strlen (s:HTAG_file ) - 14), " ", "", "g")
    "---(tag type)--------------------------------#
-   let  g:HTAG_type    = matchstr   (l:full_line, "  #3#  .*  #4#  ")
-   let  g:HTAG_type    = substitute (strpart (g:HTAG_type, 7, strlen (g:HTAG_type) - 14), " ", "", "g")
+   let  s:HTAG_type    = matchstr   (l:full_line, "  #3#  .*  #4#  ")
+   let  s:HTAG_type    = substitute (strpart (s:HTAG_type , 7, strlen (s:HTAG_type ) - 14), " ", "", "g")
    "---(statistics)------------------------------#
-   let  g:HTAG_stat    = matchstr   (l:full_line, "  #4#  .*  #5#  ")
-   let  g:HTAG_stat    = substitute (strpart (g:HTAG_stat, 7, strlen (g:HTAG_stat) - 14), " ", "", "g")
+   let  s:HTAG_stat    = matchstr   (l:full_line, "  #4#  .*  #5#  ")
+   let  s:HTAG_stat    = substitute (strpart (s:HTAG_stat , 7, strlen (s:HTAG_stat ) - 14), " ", "", "g")
+   "---(class)-----------------------------------#
+   let  s:HTAG_class   = matchstr   (l:full_line, "  #5#  .*  #6#  ")
+   let  s:HTAG_class   = substitute (strpart (s:HTAG_class, 7, strlen (s:HTAG_class) - 14), " ", "", "g")
    "---(identifier)------------------------------#
-   let  g:HTAG_iden    = matchstr   (l:full_line, "  #5#  .*  #6#  ")
-   let  g:HTAG_iden    = substitute (strpart (g:HTAG_iden, 7, strlen (g:HTAG_iden) - 14), " ", "", "g")
+   let  s:HTAG_iden    = matchstr   (l:full_line, "  #6#  .*  #7#  ")
+   let  s:HTAG_iden    = substitute (strpart (s:HTAG_iden , 7, strlen (s:HTAG_iden ) - 14), " ", "", "g")
    "---(complete)--------------------------------#
    return 1
 endfunction
@@ -669,7 +678,7 @@ endfunction
 
 function! HTAG_head(file, type)
    "---(do not allow recursion)------------------#
-   if (g:htag_locked == "y")
+   if (g:HTAG_locked == "y")
       return -2
    endif
    "---(save working win/buf/loc)----------------#
@@ -679,7 +688,7 @@ function! HTAG_head(file, type)
    "---(make sure tags are updated)--------------#
    normal ,tt
    "---(check for the window)--------------------#
-   if (HBUF_by_name(g:htag_title) < 1)
+   if (HBUF_by_name(g:HTAG_title) < 1)
       echon "HTAG_head()         :: tag window not showing..."
       return -2
    endif
@@ -711,20 +720,20 @@ function! HTAG_head(file, type)
    call HTAG_parse()
    "---(save context)----------------------------#
    normal 'X
-   let  g:HTAG_cfile   = a:file
-   let  g:HTAG_ctype   = a:type
-   let  g:HTAG_chead   = line('.')
-   let  g:HTAG_ccount  = l:count
-   let  g:HTAG_ccurr   = 1
+   let  s:HTAG_cfile   = a:file
+   let  s:HTAG_ctype   = a:type
+   let  s:HTAG_chead   = line('.')
+   let  s:HTAG_ccount  = l:count
+   let  s:HTAG_ccurr   = 1
    "---(complete)--------------------------------#
    call HBUF_restore()
-   return g:HTAG_chead
+   return s:HTAG_chead
 endfunction
 
 
 
 function! HTAG_curr()
-   echo "file=".g:HTAG_cfile.", type=".g:HTAG_ctype.", head=".g:HTAG_chead.", count=".g:HTAG_ccount.", curr=".g:HTAG_ccurr
+   echo "file=".s:HTAG_cfile.", type=".s:HTAG_ctype.", head=".s:HTAG_chead.", count=".s:HTAG_ccount.", curr=".s:HTAG_ccurr
    return
 endfunction
 
@@ -732,11 +741,11 @@ endfunction
 "==[[ create tag list for all active buffers ]]====================[ 433y6s ]==#
 func! HTAG_next ()
    "---(do not allow recursion)------------------#
-   if    (g:htag_locked == "y")
+   if    (g:HTAG_locked == "y")
       retu  -2
    endi
    "---(verify position in range)----------------#
-   if    (g:HTAG_ccurr >= g:HTAG_ccount)
+   if    (s:HTAG_ccurr >= s:HTAG_ccount)
       retu  -1
    endi
    "---(save working win/buf/loc)----------------#
@@ -744,26 +753,26 @@ func! HTAG_next ()
       retu  -2
    endi
    "---(check for the window)--------------------#
-   if    (HBUF_by_name(g:htag_title) < 1)
+   if    (HBUF_by_name(g:HTAG_title) < 1)
       echon "HTAG_head()         :: tag window not showing..."
       retu  -2
    endi
    "---(get full tag range for buffer)-----------#
-   let   g:HTAG_ccurr += 1
+   let   s:HTAG_ccurr += 1
    norm  _
-   exec  "normal ".g:HTAG_chead."G"
-   exec  "normal ".g:HTAG_ccurr."j"
+   exec  "normal ".s:HTAG_chead."G"
+   exec  "normal ".s:HTAG_ccurr."j"
    call  HTAG_parse()
    "---(complete)--------------------------------#
    call  HBUF_restore()
-   retu  g:HTAG_chead
+   retu  s:HTAG_chead
 endf
 
 
 
 function! HTAG_findloc(base_name, line_num)
    "echo "was curnum=".bufnr("%").", which is <<".bufname("%").">>"
-   let   rc = HBUF_by_name(g:htag_title)
+   let   rc = HBUF_by_name(g:HTAG_title)
    if    rc < 1
       return "[--] <<no tags>>"
    endi
@@ -806,10 +815,10 @@ function! HTAG_findloc(base_name, line_num)
       if (HTAG_parse() < 1)
          break
       endif
-      if g:HTAG_line > a:line_num
+      if s:HTAG_line > a:line_num
          break
       endif
-      let  l:rtag_final   = "[".g:HTAG_tagn."] ".g:HTAG_iden
+      let  l:rtag_final   = "[".s:HTAG_tagn."] ".s:HTAG_iden
       let  l:curr = l:curr + 1
    endwhile
    "---(complete)--------------------------------#
@@ -894,10 +903,10 @@ endf
 
 func HTAG_stats_head_srp  ()
    ""---(check function)-----------------""
-   exec  "norm ".(g:HTAG_line + s:HTAG_sadjust)."G"
+   exec  "norm ".(s:HTAG_line + s:HTAG_sadjust)."G"
    redraw!
    let   l:recd  = getline('.')
-   if    (match (l:recd, g:HTAG_iden) != 0)
+   if    (match (l:recd, s:HTAG_iden) != 0)
       retu  0
    endi
    ""---(verify space)-------------------""
@@ -933,11 +942,11 @@ func HTAG_stats_head_srp  ()
       let   s:HTAG_sprefix = strpart (l:type , 0, 12)
    endi
    "---(determine scope)---------------#
-   if    (match (g:HTAG_iden, "__unit") >  0)
+   if    (match (s:HTAG_iden, "__unit") >  0)
       let   s:HTAG_sscope  = "u"
-   elsei (match (g:HTAG_iden, "__test") >  0)
+   elsei (match (s:HTAG_iden, "__test") >  0)
       let   s:HTAG_sscope  = "u"
-   elsei (match (g:HTAG_iden, "__"    ) >  0)
+   elsei (match (s:HTAG_iden, "__"    ) >  0)
       let   s:HTAG_sscope  = "f"
    elsei (match (l:type, "static")      == 0)
       let   s:HTAG_sscope  = "s"
@@ -1260,7 +1269,7 @@ func HTAG_stats_stat_GLD   ()
    ""---(locals)-------------------""
    let   l:file    = "HTAG.c"
    ""---(callers)------------------""
-   sil!  exec   ".:!HTAG_call.awk -v g_func=".g:HTAG_iden." < HTAG.lcalls"
+   sil!  exec   ".:!HTAG_call.awk -v g_func=".s:HTAG_iden." < HTAG.lcalls"
    let   l:lcalls = getline('.')
    if    (l:lcalls  >= 36)
       let   s:HTAG_sLsize = "#"
@@ -1269,7 +1278,7 @@ func HTAG_stats_stat_GLD   ()
    else
       let   s:HTAG_sLsize = strpart ("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ", l:lcalls   , 1)
    endi
-   sil!  exec   ".:!HTAG_call.awk -v g_func=".g:HTAG_iden." < HTAG.gcalls"
+   sil!  exec   ".:!HTAG_call.awk -v g_func=".s:HTAG_iden." < HTAG.gcalls"
    let   l:gcalls = getline('.') - l:lcalls
    if    (l:gcalls  >= 36)
       let   s:HTAG_sGsize = "#"
@@ -1279,12 +1288,12 @@ func HTAG_stats_stat_GLD   ()
       let   s:HTAG_sGsize = strpart ("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ", l:gcalls   , 1)
    endi
    ""---(call depth)---------------""
-   sil!  exec   ":!grep \"".g:HTAG_iden."\" HTAG.flow > HTAG.mydepth"
+   sil!  exec   ":!grep \"".s:HTAG_iden."\" HTAG.flow > HTAG.mydepth"
    let   l:prefix         = ""
    let   l:level          =  0
    let   l:depth          = -1
    while (l:depth < 0 && l:level < 36)
-      sil!  exec   ".:!grep \"^".l:prefix.g:HTAG_iden."\" HTAG.mydepth | wc -l"
+      sil!  exec   ".:!grep \"^".l:prefix.s:HTAG_iden."\" HTAG.mydepth | wc -l"
       let   l:inden = getline('.')
       if    (l:inden > 0)
          let   l:depth = l:level
@@ -1311,7 +1320,7 @@ func HTAG_stats_stat_U     ()
    sil!  exec   ".:!ls *.unit 2> /dev/null | wc -l"
    let   l:units  = getline('.')
    if    (l:units > 0)
-      let   l:target    = printf (" %-20.20s ", g:HTAG_iden)
+      let   l:target    = printf (" %-20.20s ", s:HTAG_iden)
       sil!  exec   ".:!grep \"".l:target."\" *.unit | wc -l"
       let   l:units  = getline('.')
       if    (l:units   >= 36)
@@ -1332,13 +1341,13 @@ func HTAG_stats_class ()
       retu  0
    endi
    "---(check for easy leaf)--------------#
-   if    (match (g:HTAG_iden, "^main$") > 0)
+   if    (match (s:HTAG_iden, "^main$") > 0)
       let   s:HTAG_sclass  = "trunk"
-   elsei (match (g:HTAG_iden, "_init$") > 0)
+   elsei (match (s:HTAG_iden, "_init$") > 0)
       let   s:HTAG_sclass  = "shoot"
-   elsei (match (g:HTAG_iden, "_wrap$") > 0)
+   elsei (match (s:HTAG_iden, "_wrap$") > 0)
       let   s:HTAG_sclass  = "shoot"
-   elsei (match (g:HTAG_iden, "__unit") > 0)
+   elsei (match (s:HTAG_iden, "__unit") > 0)
       let   s:HTAG_sclass  = "light"
    elsei (s:HTAG_sfsize == 0)
       let   s:HTAG_sclass  = "leaf"
@@ -1386,9 +1395,9 @@ endf
 
 func HTAG_stats_read  ()
    ""---(check function)-----------------""
-   exec  "norm ".g:HTAG_line."G"
+   exec  "norm ".s:HTAG_line."G"
    let   l:recd  = getline('.')
-   if    (match (l:recd, g:HTAG_iden) != 0)
+   if    (match (l:recd, s:HTAG_iden) != 0)
       retu  0
    endi
    ""---(check for prefix)---------------""
@@ -1446,7 +1455,7 @@ func HTAG_stats_tag   ()
    setl  modifiable
    ""---(handle groups)------------------""
    if    (s:HTAG_sscope == "-")
-      if    (match (g:HTAG_iden, "o___") >= 0)
+      if    (match (s:HTAG_iden, "o___") >= 0)
          let   s:HTAG_sgroup   += 1
          exec  ":norm  93|Rgroup     "
          exec  ":norm  120|R sr tsd plr cf   mi nog0 GLD U   -- --- --- -- "
@@ -1470,8 +1479,8 @@ func HTAG_stats_tag   ()
       exec  ":norm  145|R".s:HTAG_sGsize.s:HTAG_sLsize.s:HTAG_sDsize."."
       exec  ":norm  149|R".s:HTAG_sUsize."]"
       ""---(title and type)--------------""
-      exec  ":norm  241|R".s:HTAG_stitle
-      exec  ":norm  288|R".s:HTAG_sclass
+      exec  ":norm  174|R".s:HTAG_sclass
+      exec  ":norm  238|R".s:HTAG_stitle
    endif
    "---(complete)-------------------------#
    setl  nomodifiable
@@ -1516,12 +1525,19 @@ func HTAG_stats_file  (action, bufno)
       retu  0
    endi 
    "---(parse the first)------------------#
-   norm  mX
-   norm  j
+   if    (a:action == "c")
+      if    (search ("^[a-z][A-Za-z]  ".g:HTAG_cword, "W", l:bot) < 1)
+         retu  0
+      endi 
+      norm  mX
+   else
+      norm  mX
+      norm  j
+   endi
    call  HTAG_parse ()
    "---(walk the functions)---------------#
    let   s:HTAG_sadjust  = 0
-   while (g:HTAG_type == "function" || g:HTAG_type == "group")
+   while (s:HTAG_type == "function" || s:HTAG_type == "group")
       ""---(common)-------------------------""
       let   s:HTAG_sfunc += 1
       norm  mX
@@ -1533,7 +1549,7 @@ func HTAG_stats_file  (action, bufno)
          call  HTAG_stats_read  ()           
       endi
       ""---(write)--------------------------""
-      if    (a:action == "w")
+      if    (a:action == "w" || a:action == "c")
          call  HTAG_stats_head_srp  ()           
          call  HTAG_stats_size_tsd  ()           
          call  HTAG_stats_stat_rlf  ()           
@@ -1546,6 +1562,9 @@ func HTAG_stats_file  (action, bufno)
       endi
       ""---(common)-------------------------""
       call  HTAG_stats_tag   ()           
+      if    (a:action == "c")
+         break
+      endi
       norm  0j
       call  HTAG_parse       ()
    endw
@@ -1562,22 +1581,38 @@ func HTAG_stats_full  (action)
    let   s:HTAG_sgroup     = 0
    let   s:HTAG_sbad       = 0
    ""---(prepare global flow)------------""
-   if    (a:action == "w")
-      sil!  exec ":!make clean"
-      sil!  exec ":!cflow -r -d 2 *.c 2> /dev/null > HTAG.gcalls"
-      sil!  exec ":!cflow -d 150  *.c 2> /dev/null > HTAG.flow"
-      redraw!
+   sil!  exec ":!make clean"
+   sil!  exec ":!cflow -r -d 2 *.c 2> /dev/null > HTAG.gcalls"
+   sil!  exec ":!cflow -d 150  *.c 2> /dev/null > HTAG.flow"
+   redraw!
+   ""---(run all files)------------------""
+   if    (a:action == "r" || a:action == "w")
+      let   l:bufno           = HBUF_next (0)
+      while (l:bufno > 0)
+         call  HTAG_stats_file (a:action, l:bufno)
+         let   l:bufno = HBUF_next (l:bufno)
+      endw
    endi
-   ""---(first file)---------------------""
-   let   l:bufno           = HBUF_next (0)
-   ""---(run each file)------------------""
-   while (l:bufno > 0)
-      call  HTAG_stats_file (a:action, l:bufno)
-      let   l:bufno = HBUF_next (l:bufno)
-   endw
+   ""---(run only current file)----------""
+   if    (a:action == "f")
+      norm  mX
+      norm  ,a
+      let   l:bufno           = bufnr ('%')
+      norm  ,t
+      call  HTAG_stats_file ("w", l:bufno);
+   endi
+   ""---(run only current function)------""
+   if    (a:action == "c")
+      norm  mX
+      norm  ,a
+      let   l:bufno           = bufnr ('%')
+      norm  ,t
+      call  HTAG_stats_file (a:action, l:bufno);
+   endi
    ""---(final status)-------------------""
    echon "HTAG_stats ()         :: files=".s:HTAG_sfile.", procd=".s:HTAG_scfile.", funcs=".s:HTAG_sfunc.", good =".s:HTAG_sgood.", group=".s:HTAG_sgroup.", bad  =".s:HTAG_sbad
    sil!  exec  ":write! HTAG.tags"
+   sil!  exec  ":!HTAG_gyges.awk < HTAG.tags > HTAG.gyges"
    norm  ,a
    redraw!
    ""---(complete)-----------------------""
