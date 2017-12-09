@@ -474,7 +474,7 @@ func! HFIX_compile(std)
    sil!  exec  printf("normal i%-86.86s\n", "compilation in progress...")
    redraw!
    "---(cleaning)-------------------s------------#
-   if    a:std == "q"
+   if    a:std == "a"
       sil!  exec ":silent 1,$!make -s clean"
    endi
    if    a:std == "x" || a:std == "X"
@@ -490,7 +490,7 @@ func! HFIX_compile(std)
       exec printf("normal i%-86.86s", "end of installation feedback")
    endi
    "---(compliation)-----------------------------#
-   if    a:std == "q" || a:std == "c"
+   if    a:std == "q" || a:std == "c" || a:std == "a"
       sil!  exec ":silent 1,$!make -s"
       "---(eliminate wide-characters)---------------#
       sil!  exec ':silent 1,$:s/\%u2018/"/ge'
@@ -533,7 +533,7 @@ func! HFIX_compile(std)
       exec "normal o"
       exec printf("normal i%-86.86s", "end of installation feedback")
    endif
-   if    a:std == "q"
+   if    a:std == "q" || a:std == "a"
       sil!  exec ":silent $!make -s install"
       normal GG
       exec "normal o"

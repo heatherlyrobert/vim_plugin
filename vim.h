@@ -1,2 +1,2 @@
-#define    VER_NUM "1.5s"
-#define    VER_TXT "fixed a wicked error due to misnamed global var"
+#define    VER_NUM "1.5t"
+#define    VER_TXT "changed ,qq to not clean first; ,ga does that whole thing now"
