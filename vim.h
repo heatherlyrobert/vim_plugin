@@ -1,2 +1,2 @@
-#define    VER_NUM "1.6a"
-#define    VER_TXT "updated HBUF to use ,, for previous and clean display"
+#define    VER_NUM "1.6b"
+#define    VER_TXT "updated HBUF to adapt to window width and ,bb to update buffer"

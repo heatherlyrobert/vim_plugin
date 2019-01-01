@@ -149,6 +149,7 @@ func! s:HBUF_keys()
    nmap  <buffer>   -      :call HBUF_resize("-")<cr>
    nmap  <buffer>   +      :call HBUF_resize("+")<cr>
    nmap  <buffer>   h      :call HBUF_hide()<cr>
+   nmap  <buffer>   b      :call HBUF_update()<cr>
    "---(complete)------------------------------------#
    setlo nomodifiable
    retu
@@ -435,6 +436,8 @@ func! HBUF_list()
    let   l:bufc        = '0'
    let   l:cur         = 0
    let   l:max         = 0
+   let   l:max_cols    = winwidth ('%')
+   let   l:max_horz    = (l:max_cols - 2) / 21
    "---(initialize mapping)----------------------#
    while (i < 9)
       sil!  exec 'map ,'.i.'  :call HBUF_goto("UNSET")<cr>'
@@ -457,7 +460,7 @@ func! HBUF_list()
       "---(create meaningful markings)-----------#
       if    (bufwinnr(l:i) > 0)                      ">> if in a window
          let   l:buf_mark = ">"
-         let l:cur = l:buf_count / 5
+         let l:cur = l:buf_count / l:max_horz
       else
          if    (getbufvar(l:i, '&modified') == 1)     ">> not in window, but changed
             let   l:buf_mark = ")"
@@ -466,7 +469,7 @@ func! HBUF_list()
          endif
       endif
       "---(add to the buffer list)---------------#
-      if l:buf_count != 0 && fmod (l:buf_count, 5) == 0
+      if l:buf_count != 0 && fmod (l:buf_count, l:max_horz) == 0
          let   buf_list .= ">>\n"
       endif
       "---(shortcuts)----------------------------#
@@ -494,12 +497,8 @@ func! HBUF_list()
    norm  _
    put! = l:buf_list
    norm  0
+   silent! exec "normal obufs = ".l:buf_count.", cur = ".l:cur." cols = ".l:max_cols." horz = ".l:max_horz
    "---(position)--------------------------------#
-   "  let l:max = l:buf_count / 5
-   "  silent! exec "normal obufs = ".l:buf_count.", cur = ".l:cur.", max = ".l:max
-   "  if  l:cur == l:max
-   "     let l:cur -= 1
-   "  endif
    if l:cur > 0
       silent! exec "normal _0".l:cur."j"
    else
