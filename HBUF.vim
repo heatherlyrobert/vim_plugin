@@ -76,7 +76,11 @@ let g:hbuf_pbuf     = 0    " current programming buffer number
 let g:hbuf_pname    = ""   " current programming buffer name
 let g:hbuf_pline    = 0    " current programming buffer line
 let g:hbuf_pcol     = 0    " current programming buffer column
+
 let s:hbuf_size     = 1    " window height
+
+let s:hbuf_snum     = 1
+let s:hbuf_sname    = ""
 
 
 
@@ -117,10 +121,10 @@ funct! s:HBUF_syntax()
    setlo modifiable
    syn   clear
    syn   match hbuf_cont      '>>'
-   syn   match hbuf_visible   '[0-9A-F][>][A-Za-z0-9\._-]\+ '
-   syn   match hbuf_changed   '[0-9A-F][)][A-Za-z0-9\._-]\+ '
-   syn   match hbuf_hidden    '[0-9A-F]\][A-Za-z0-9\._-]\+ '
-   syn   match hbuf_id        '[0-9A-F][)>\]]' contained
+   syn   match hbuf_visible   '[0-9A-Z][>][A-Za-z0-9\._-]\+ '
+   syn   match hbuf_changed   '[0-9A-Z][)][A-Za-z0-9\._-]\+ '
+   syn   match hbuf_hidden    '[0-9A-Z]\][A-Za-z0-9\._-]\+ '
+   syn   match hbuf_id        '[0-9A-Z][)>\]]' contained
             \ containedin=hbuf_visible,hbuf_hidden,hbuf_changed
    syn   match hbuf_timess    '[#][0-9]\+$'
    high  hbuf_cont   cterm=bold ctermbg=none ctermfg=5
@@ -139,6 +143,7 @@ func! s:HBUF_keys()
    "---(specific)------------------------------------#
    nmap            ,a      :silent! exec "3 wincmd w"<cr>
    nmap            ,b      :call HBUF_show()<cr>
+   nmap            ,,      :call HBUF_goto(",")<cr>
    nmap  <buffer>   b      :call HBUF_update()<cr>
    "---(presentation/size)---------------------------#
    nmap  <buffer>   -      :call HBUF_resize("-")<cr>
@@ -228,7 +233,7 @@ function! HBUF_show()
    "endif
    "---(open the buffer window)------------------#
    sil!  exec  'topleft split ' . g:hbuf_title
-   call  HBUF_resize("0")
+   call  HBUF_resize("?")
    "---(create the autocommands)-----------------#
    call s:HBUF_auto()
    "---(update)----------------------------------#
@@ -266,6 +271,10 @@ func! HBUF_resize(height)
       let   s:hbuf_size -= 1
    elsei (a:height == "0")
       let   s:hbuf_size  = 1
+   elsei (a:height == "?")
+      let   s:hbuf_size  = s:hbuf_size
+   else
+      let   s:hbuf_size  = a:height
    endi
    ""---(test size values)-----------------------#
    if    (s:hbuf_size > 3)
@@ -287,41 +296,45 @@ endf
 func! s:o___SPECIFIC________o()
 endf
 
+let s:hbuf_prev     = 1
 
-function! HBUF_goto(buf_name)
-   let l:buf_num = bufnr(a:buf_name)
+function! HBUF_goto (buf_name)
+   "---(locals)---------------------------#
+   let l:buf_cnum  = bufnr('%')
+   let l:buf_cname = a:buf_name
+   let l:buf_nnum  = 0
+   "---(basic validity checks)------------#
+   if getbufvar(l:buf_cnum, '&modifiable') == 0
+      echon "HBUF_goto()        :: can not load a new buffer in specialty window..."
+      return
+   endif
+   if getbufvar(l:buf_cnum, '&buflisted') == 0
+      echon "HBUF_goto()        :: can not load a new buffer in specialty window..."
+      return
+   endif
+   "---(find destination)-----------------#
+   if l:buf_cname == ","
+      let l:buf_cname = s:hbuf_sname
+   endif
+   let l:buf_nnum = bufnr(l:buf_cname)
    "---(check on the destination)----------------#
-   if(l:buf_num < 1)
-      echon "HBUF_goto()        :: buffer <<".a:buf_name.">> does not exist..."
+   if l:buf_nnum < 1
+      echon "HBUF_goto()        :: buffer <<".l:buf_cname.">> does not exist..."
       return -1
    endif
-   if (getbufvar(l:buf_num, '&buflisted') == 0)
-      echon "HBUF_goto()        :: buffer <<".a:buf_name.">> is not listed..."
+   if getbufvar(l:buf_nnum, '&buflisted') == 0
+      echon "HBUF_goto()        :: buffer <<".l:buf_cname.">> is not listed..."
       return 0
    endif
-   "---(basic validity checks)-------------------#
-   let l:buf_cur = bufnr('%')
-   if (getbufvar(l:buf_cur, '&modifiable') == 0)
-      echon "HBUF_goto()        :: can not load a new buffer in specialty window..."
-      return
-   endif
-   if (getbufvar(l:buf_cur, '&buflisted') == 0)
-      echon "HBUF_goto()        :: can not load a new buffer in specialty window..."
-      return
-   endif
-   "---(don't reshow a buffer)-------------------#
-   let   buf_num = bufnr(a:buf_name)
-   if    buf_num == buf_cur
-      echon "HBUF_goto()        :: buffer (".l:buf_num.") already loaded in this window..."
-      return
-   endif
-   if(l:buf_num < 1)
-      echon "HBUF_goto()        :: buffer number less that 1, can not load..."
+   if l:buf_nnum == l:buf_cnum
+      echon "HBUF_goto()        :: buffer (".l:buf_nnum.") already loaded in this window..."
       return
    endif
    "---(show it)---------------------------------#
-   silent! exec('b! ' . l:buf_num)
-   echon "HBUF_goto()        :: moved to (".l:buf_num.") ".a:buf_name
+   let s:hbuf_snum  = l:buf_cnum
+   let s:hbuf_sname = bufname ("%")
+   silent! exec('b! ' . l:buf_nnum)
+   echon "HBUF_goto()        :: moved to (".l:buf_nnum.") ".l:buf_cname
    "---(complete)--------------------------------#
    return
 endfunction
@@ -418,20 +431,20 @@ func! HBUF_list()
    "---(prepare loop vars)-----------------------#
    let   l:max_buf_num = bufnr('$')     " number of the last buffer.
    let   l:buf_count   = 0              " count of listed buffers
-   let   g:hbuf_size   = 1
    let   l:i           = 1              " current buffer index
    let   l:bufc        = '0'
+   let   l:cur         = 0
+   let   l:max         = 0
    "---(initialize mapping)----------------------#
    while (i < 9)
       sil!  exec 'map ,'.i.'  :call HBUF_goto("UNSET")<cr>'
       let   i += 1
    endw
-   while (i < 16)
+   while (i < 25)
       sil!  exec 'map ,A  :call HBUF_goto("UNSET")<cr>'
       let   i += 1
    endw
    "---(process all buffers)---------------------#
-   call  HBUF_resize("0")
    let   i = HBUF_next(0)
    while (i > 0)
       "---(process name)-------------------------#
@@ -444,6 +457,7 @@ func! HBUF_list()
       "---(create meaningful markings)-----------#
       if    (bufwinnr(l:i) > 0)                      ">> if in a window
          let   l:buf_mark = ">"
+         let l:cur = l:buf_count / 5
       else
          if    (getbufvar(l:i, '&modified') == 1)     ">> not in window, but changed
             let   l:buf_mark = ")"
@@ -452,20 +466,16 @@ func! HBUF_list()
          endif
       endif
       "---(add to the buffer list)---------------#
-      if    buf_count == 5
+      if l:buf_count != 0 && fmod (l:buf_count, 5) == 0
          let   buf_list .= ">>\n"
-         call  HBUF_resize("+")
-      elsei buf_count == 10
-         let   l:buf_list .= ">>\n"
-         call  HBUF_resize("+")
       endif
       "---(shortcuts)----------------------------#
       if    buf_count < 10
          let   buf_list .= printf("%d%s%-18.18s ", l:buf_count, l:buf_mark, l:buf_short)
-         sil!  exec 'nmap          ,'.l:buf_count.'  :call HBUF_goto("'.l:buf_name.'")<cr>'
+         sil!  exec 'nmap           ,'.l:buf_count.'  ,a:call HBUF_goto("'.l:buf_name.'")<cr>'
       else
          let   buf_list .= printf("%c%s%-18.18s ", l:buf_count + 55, buf_mark, buf_short)
-         sil!  exec 'nmap           ,'.nr2char(buf_count + 55).'  ,a:call HBUF_goto("'.buf_name.'")<cr>'
+         sil!  exec 'nmap           ,'.nr2char(buf_count + 55).'  ,a:call HBUF_goto("'.l:buf_name.'")<cr>'
       endif
       let   buf_raw  .= buf_name . " "
       let   i = HBUF_next(i)
@@ -479,22 +489,23 @@ func! HBUF_list()
    let g:hbuf_raw  = l:buf_raw
    "---(prepare)---------------------------------#
    setlocal modifiable
-   1,$d
-   norm  _
-   "---(format the list)-------------------------#
-   "if   buf_count < 10
-   "   let  l:buf_list  = printf("%1d ", l:buf_count) . g:hbuf_list
-   "else
-   "   let  l:buf_list  = "+ " . g:hbuf_list
-   "endi
-   "let  l:buf_list .= "#" . g:hbuf_times
-   "---(add help)--------------------------------#
-   " TBD
    "---(update)----------------------------------#
    1,$d
    norm  _
    put! = l:buf_list
    norm  0
+   "---(position)--------------------------------#
+   "  let l:max = l:buf_count / 5
+   "  silent! exec "normal obufs = ".l:buf_count.", cur = ".l:cur.", max = ".l:max
+   "  if  l:cur == l:max
+   "     let l:cur -= 1
+   "  endif
+   if l:cur > 0
+      silent! exec "normal _0".l:cur."j"
+   else
+      silent! exec "normal _0"
+   endif
+   norm zt
    "---(done)------------------------------------#
    setlo wrap
    setlo nomodifiable
