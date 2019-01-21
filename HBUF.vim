@@ -144,7 +144,6 @@ func! s:HBUF_keys()
    nmap            ,a      :silent! exec "3 wincmd w"<cr>
    nmap            ,b      :call HBUF_show()<cr>
    nmap            ,,      :call HBUF_goto(",")<cr>
-   nmap  <buffer>   b      :call HBUF_update()<cr>
    "---(presentation/size)---------------------------#
    nmap  <buffer>   -      :call HBUF_resize("-")<cr>
    nmap  <buffer>   +      :call HBUF_resize("+")<cr>
@@ -158,10 +157,10 @@ endf
 
 func! s:HBUF_unkeys()
    setlo modifiable
-   nunm  <buffer>   b
    nunm  <buffer>   -
    nunm  <buffer>   +
    nunm  <buffer>   h
+   nunm  <buffer>   b
    setlo nomodifiable
    retu
 endf
@@ -453,6 +452,9 @@ func! HBUF_list()
       "---(process name)-------------------------#
       let   l:buf_name = bufname(l:i)
       if    (strlen(l:buf_name) < 1)                 ">> only show named
+         cont
+      endif
+      if    (l:buf_name == "polymnia.htags")         ">> do not show tags file
          cont
       endif
       let   l:buf_short = fnamemodify(l:buf_name, ":t")
