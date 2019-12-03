@@ -154,6 +154,8 @@ let   s:hfix_tagn     = ""
 let   s:gcc_call      = "make -s install"
 let   s:gcc_std       = " "
 
+let   s:hfix_winline  = 0
+
 
 
 
@@ -174,10 +176,11 @@ endf
 
 func! s:HFIX_init()
    sil!  exec  'split ' . g:hfix_title
-   call  HFIX_resize("o")
-   call  HALL_start()
-   call  s:HFIX_syntax()
-   call  s:HFIX_keys()
+   call  HFIX_resize   ("o")
+   call  HALL_start    ()
+   call  s:HFIX_prefix ()
+   call  s:HFIX_syntax ()
+   call  HFIX_keys     ()
    hide
    retu
 endf
@@ -191,21 +194,28 @@ func! s:HFIX_syntax()
    syn   match rsh_fix_opt      '^options :: .*$'
    syn   match rsh_fix_end      '^beginning of .*$'
    syn   match rsh_fix_end      '^end of .*$'
-   syn   match rsh_fix_help     '^help   .*$'
-   syn   match rsh_fix_esum     '^gcc/make (FAIL).*$'
-   syn   match rsh_fix_wsum     '^gcc/make (warn).*$'
-   syn   match rsh_fix_lsum     '^gcc/make (LINK).*$'
-   syn   match rsh_fix_psum     '^gcc/make (pass).*$'
+   syn   match rsh_fix_recomp   '^recompile .*$'
+   syn   match rsh_fix_help     '^gcc/make (help).*$'
+   syn   match rsh_fix_clean    '^CLEANING >>.*$'
+   syn   match rsh_fix_note     '^no .* requested.*'
+   syn   match rsh_fix_esum     '^compiler (FAIL).*$'
+   syn   match rsh_fix_wsum     '^compiler (warn).*$'
+   syn   match rsh_fix_lsum     '^compiler (LINK).*$'
+   syn   match rsh_fix_psum     '^compiler (pass).*$'
    syn   match rsh_fix_prog     '^compilation.*$'
-   high  rsh_fix_file  cterm=bold   ctermbg=none  ctermfg=5
-   high  rsh_fix_opt   cterm=bold   ctermbg=none  ctermfg=5
-   high  rsh_fix_end   cterm=bold,reverse  ctermbg=none  ctermfg=5
-   high  rsh_fix_help  cterm=bold   ctermbg=none  ctermfg=5
-   high  rsh_fix_esum  cterm=none   ctermbg=1     ctermfg=none
-   high  rsh_fix_wsum  cterm=none   ctermbg=3     ctermfg=none
-   high  rsh_fix_lsum  cterm=none   ctermbg=5     ctermfg=none
-   high  rsh_fix_psum  cterm=none   ctermbg=2     ctermfg=none
-   high  rsh_fix_prog  cterm=bold   ctermbg=none  ctermfg=5
+   high  rsh_fix_file     cterm=bold   ctermbg=none  ctermfg=5
+   high  rsh_fix_opt      cterm=bold   ctermbg=none  ctermfg=5
+   "high  rsh_fix_end      cterm=bold,reverse  ctermbg=none  ctermfg=5
+   high  rsh_fix_end      cterm=reverse  ctermbg=none  ctermfg=5
+   high  rsh_fix_recomp   cterm=reverse  ctermbg=none  ctermfg=5
+   high  rsh_fix_esum     cterm=none   ctermbg=1     ctermfg=none
+   high  rsh_fix_wsum     cterm=none   ctermbg=3     ctermfg=none
+   high  rsh_fix_lsum     cterm=none   ctermbg=5     ctermfg=none
+   high  rsh_fix_psum     cterm=none   ctermbg=2     ctermfg=none
+   high  rsh_fix_help     cterm=none   ctermbg=2     ctermfg=none
+   high  rsh_fix_clean    cterm=none   ctermbg=1     ctermfg=0
+   high  rsh_fix_note     cterm=none   ctermbg=4     ctermfg=0
+   high  rsh_fix_prog     cterm=bold   ctermbg=none  ctermfg=5
    "---(syntax highlighting = tags)--------------#
    syn   match hfix_mtag     '^[A-Z-][A-Z-]  '
             \ containedin=rsh_fix_eone, rsh_fix_wone
@@ -235,38 +245,44 @@ func! s:HFIX_syntax()
 endf
 
 
-func! s:HFIX_keys()
+func! HFIX_keys()
    setlo  modifiable
-   nmap            ,q      :call HFIX_show()<cr>
-   nmap  <buffer>   q      :call HFIX_compile("q")<cr>
-   nmap  <buffer>   x      :call HFIX_compile("x")<cr>
-   nmap  <buffer>   X      :call HFIX_compile("X")<cr>
-   nmap  <buffer>   c      :call HFIX_compile("c")<cr>
-   nmap  <buffer>   u      :call HFIX_compile("u")<cr>
-   nmap  <buffer>   i      :call HFIX_compile("i")<cr>
-   nmap  <buffer>   m      :call HFIX_compile("m")<cr>
+   nmap            ,q      :call HFIX_show    ()<cr>
+   nmap  <buffer>   q      :call HFIX_compile ("q")<cr>
+   nmap  <buffer>   f      :call HFIX_compile ("f")<cr>
+   nmap  <buffer>   w      :call HFIX_compile ("w")<cr>
+   nmap  <buffer>   x      :call HFIX_compile ("x")<cr>
+   nmap  <buffer>   a      :call HFIX_compile ("a")<cr>
+   nmap  <buffer>   c      :call HFIX_compile ("c")<cr>
+   nmap  <buffer>   i      :call HFIX_compile ("i")<cr>
+   nmap  <buffer>   u      :call HFIX_compile ("u")<cr>
+   nmap  <buffer>   m      :call HFIX_compile ("m")<cr>
+   nmap  <buffer>   Z      :call HFIX_unkeys  ()<cr>
    "---(presentation/size)---------------------------#
-   nmap  <buffer>   -      :call HFIX_resize("-")<cr>
-   nmap  <buffer>   +      :call HFIX_resize("+")<cr>
-   nmap  <buffer>   h      :call HFIX_hide()<cr>
+   nmap  <buffer>   -      :call HFIX_resize  ("-")<cr>
+   nmap  <buffer>   +      :call HFIX_resize  ("+")<cr>
+   nmap  <buffer>   h      :call HFIX_hide    ()<cr>
    "---(complete)------------------------------------#
    setlo  nomodifiable
    retu
 endf
 
 
-func! s:HFIX_unkeys()
+func! HFIX_unkeys()
    setlo  modifiable
    nunm  <buffer>  q
+   nunm  <buffer>  f
+   nunm  <buffer>  w
    nunm  <buffer>  x
-   nunm  <buffer>  X
+   nunm  <buffer>  a
    nunm  <buffer>  c
-   nunm  <buffer>  u
    nunm  <buffer>  i
+   nunm  <buffer>  u
    nunm  <buffer>  m
    nunm  <buffer>  +
    nunm  <buffer>  -
    nunm  <buffer>  h
+   nmap  <buffer>  Z      :call HFIX_keys  ()<cr>
    setlo  nomodifiable
    retu
 endf
@@ -453,111 +469,221 @@ func! s:HFIX_sparms(std)
    retu  0
 endf
 
+func! s:HFIX_prefix  ()
+   setlo  modifiable
+   sil!   exec   ":silent 1,$d"
+   sil!   exec   printf ("normal i%-86.86s\n", "gcc/make (help) q:quik f:full w:wipe a:ansi c:comp u:test m:manu ;;tags Z:revw/done")
+   setlo  nomodifiable
+endf
 
-func! HFIX_compile(std)
+func! s:HFIX_prepare ()
+   let    g:hfix_locked = "y"
+   echon  "HFIX_compile()    :: compiling ".g:hfix_sources."..."
+   call   HFIX_unkeys()
+   setlo  modifiable
+   sil!   exec   ":silent 2,$d"
+   redraw!
+endf
+
+func! s:HFIX_clean   (a_opt)
+   normal GG0
+   if     (a:a_opt == "w")
+      sil!   exec   ":silent 2,$!make -s clean"
+      sil!   exec   printf ("normal GGo%-86.86s", "CLEANING >> erase primary working files before compiling (will cause FULL compile)")
+   elseif (stridx ("xf", a:a_opt) >= 0)
+      sil!   exec   ":silent 2,$!make -s bigclean"
+      sil!   exec   printf ("normal GGo%-86.86s", "CLEANING >> erase ALL working files before compiling (will cause FULL compile)")
+   else
+      sil!   exec   printf ("normal GGo%-86.86s", "no cleaning requested")
+   endif
+   redraw!
+endf
+
+func! s:HFIX_make     (a_opt)
+   normal GG
+   if     (stridx ("qca", a:a_opt) >= 0)
+      "---(preview)---------------------------------#
+      sil!   exec   printf ("normal GG0o%-86.86s", "previewing source code compilation...")
+      let    l:curr_line    = line ('.')
+      sil!   exec   ":silent ".l:curr_line.",$!make --recon"
+      sil!   exec   ":silent ".l:curr_line.",$!HFIX_recon.awk"
+      "---(prepare)---------------------------------#
+      sil!   exec   printf ("normal GG0o%-86.86s", "compilation and linking of source code underway...")
+      normal _0GG
+      let    l:curr_line    = line ('.')
+      redraw!
+      "---(compile)---------------------------------#
+      sil!   exec   ":silent ".l:curr_line.",$!make"
+      "---(eliminate wide-characters)---------------#
+      sil!   exec   ":silent ".l:curr_line.",$:s/\%u2018/�/ge"
+      sil!   exec   ":silent ".l:curr_line.",$:s/\%u2019/�/ge'"
+      "---(format the results)----------------------#
+      sil!   exec   ":silent ".l:curr_line.",$!HFIX.awk"
+      "---(add a footer)----------------------------#
+      " exec   printf ("normal GGo%-86.86s", "end of compiler feedback")
+   elseif (a:a_opt == "u")
+      "---(prepare)---------------------------------#
+      sil!   exec   printf ("normal GG0o%-86.86s", "compilation of unit tests underway...")
+      normal GG0
+      redraw!
+      let    l:curr_line    = line ('.')
+      "---(compile)---------------------------------#
+      sil!   exec   ":silent ".l:curr_line.",$!make units"
+      "---(eliminate wide-characters)---------------#
+      sil!   exec   ":silent ".l:curr_line.",$:s/\%u2018/�/ge"
+      sil!   exec   ":silent ".l:curr_line.",$:s/\%u2019/�/ge"
+      "---(format the results)----------------------#
+      sil!   exec   ":silent ".l:curr_line.",$!HFIX.awk"
+      "---(add a footer)----------------------------#
+      " exec   printf ("normal GGo%-86.86s", "end of compiler feedback")
+   else
+      sil!   exec   printf ("normal GGo%-86.86s", "no compilation requested")
+   endi
+   redraw!
+endf
+
+func! s:HFIX_install  (a_opt)
+   if     (stridx ("iqf", a:a_opt) >= 0)
+      sil!   exec   printf ("normal GG0o%-86.86s", "binary code installation underway...")
+      normal GG0
+      redraw!
+      let    l:curr_line    = line ('.')
+      sil!  exec ":silent ".l:curr_line.",$!make -s install"
+      exec printf("normal GGo%-86.86s", "end of installation feedback")
+   elseif (a:a_opt == "m")
+      sil!   exec   printf ("normal GG0o%-86.86s", "binary code installation underway...")
+      normal GG0
+      redraw!
+      let    l:curr_line    = line ('.')
+      sil!  exec ":silent ".l:curr_line.",$!make -s install_man"
+      exec printf("normal GGo%-86.86s", "end of installation feedback")
+   else
+      sil!   exec   printf ("normal GGo%-86.86s", "no installation requested")
+   endif
+endf
+
+func! HFIX_compile  (a_opt)
+   "---(defenses)--------------------------------#
    if    bufwinnr(g:HTAG_title) < 1
-      echon "HFIX_compile()           :: tag window must be open (returning)..."
+      call   s:HFIX_prefix ()
+      echon  "HFIX_compile()           :: tag window must be open (returning)..."
       retu
    endi
    if    (g:hfix_locked == "y")
-      echon "HFIX_compile()   :: already compiling, locked!"
+      call   s:HFIX_prefix ()
+      echon  "HFIX_compile()   :: already compiling, locked!"
       retu
    endi
-   let   g:hfix_locked = "y"
-   echon "HFIX_compile()    :: compiling ".g:hfix_sources."..."
-   "if (s:HFIX_sparms(a:std) < 0)
-   "   retu
-   "endif
-   call  s:HFIX_unkeys()
-   setlocal modifiable
-   sil!  exec ":silent 1,$d"
-   sil!  exec  printf("normal i%-86.86s\n", "compilation in progress...")
-   redraw!
+   "---(prepare)---------------------------------#
+   " call   s:HFIX_prefix  ()
+   call   s:HFIX_prepare ()
+   call   s:HFIX_clean   (a:a_opt)
+   call   s:HFIX_make    (a:a_opt)
+   call   s:HFIX_install (a:a_opt)
+
+   norm  _j
+   setlo nomodifiable
+   let   g:hfix_locked = "n"
+   call  HFIX_keys()
+   call  HBUF_restore()
+   retu
+
+
+   "---(clean)-----------------------------------#
+   " let   g:hfix_locked = "y"
+   " echon "HFIX_compile()    :: compiling ".g:hfix_sources."..."
+   " call  HFIX_unkeys()
+   " setlocal modifiable
+   " sil!  exec ":silent 1,$d"
+   " sil!  exec  printf("normal i%-86.86s\n", "compilation in progress...")
+   " redraw!
    "---(cleaning)-------------------s------------#
-   if    a:std == "a"
-      sil!  exec ":silent 1,$!make -s clean"
-   endi
-   if    a:std == "x" || a:std == "X"
-      sil!  exec ":silent 1,$!make -s clean"
-      if (a:std == "X")
-         sil!  exec ":silent $!make -s bigclean"
-      endif
-      normal _
-      exec "normal O"
-      exec printf("normal i%-86.86s", "gcc/make (pass) | temporary file clean request")
-      normal GG
-      exec "normal o"
-      exec printf("normal i%-86.86s", "end of installation feedback")
-   endi
+   " if    a:std == "a"
+   "    sil!  exec ":silent 1,$!make -s clean"
+   " endi
+   " if    a:std == "x" || a:std == "X"
+   "    sil!  exec ":silent 1,$!make -s clean"
+   "    if (a:std == "X")
+   "       sil!  exec ":silent $!make -s bigclean"
+   "    endif
+   "    normal _
+   "    exec "normal O"
+   "    exec printf("normal i%-86.86s", "gcc/make (pass) | temporary file clean request")
+   "    normal GG
+   "    exec "normal o"
+   "    exec printf("normal i%-86.86s", "end of installation feedback")
+   " endi
    "---(compliation)-----------------------------#
-   if    a:std == "q" || a:std == "c" || a:std == "a"
-      sil!  exec ":silent 1,$!make -s"
-      "---(eliminate wide-characters)---------------#
-      sil!  exec ':silent 1,$:s/\%u2018/"/ge'
-      sil!  exec ':silent 1,$:s/\%u2019/"/ge'
-      "---(format the results)----------------------#
-      sil!  exec ":silent 1,$!HFIX.awk"
-      "---(add a footer)----------------------------#
-      normal GG
-      exec "normal o"
-      exec printf("normal i%-86.86s", "end of compiler feedback")
-   endi
-   if    a:std == "u"
-      sil!  exec ":silent 1,$!make -s units"
-      "---(eliminate wide-characters)---------------#
-      sil!  exec ':silent 1,$:s/\%u2018/"/ge'
-      sil!  exec ':silent 1,$:s/\%u2019/"/ge'
-      "---(format the results)----------------------#
-      sil!  exec ":silent 1,$!HFIX.awk"
-      "---(add a footer)----------------------------#
-      normal GG
-      exec "normal o"
-      exec printf("normal i%-86.86s", "end of compiler feedback")
-   endi
+   " if    a:std == "q" || a:std == "c" || a:std == "a"
+   "    sil!  exec ":silent 1,$!make -s"
+   "    "---(eliminate wide-characters)---------------#
+   "    sil!  exec ':silent 1,$:s/\%u2018/"/ge'
+   "    sil!  exec ':silent 1,$:s/\%u2019/"/ge'
+   "    "---(format the results)----------------------#
+   "    sil!  exec ":silent 1,$!HFIX.awk"
+   "    "---(add a footer)----------------------------#
+   "    normal GG
+   "    exec "normal o"
+   "    exec printf("normal i%-86.86s", "end of compiler feedback")
+   " endi
+   " if    a:std == "u"
+   "    sil!  exec ":silent 1,$!make -s units"
+   "    "---(eliminate wide-characters)---------------#
+   "    sil!  exec ':silent 1,$:s/\%u2018/"/ge'
+   "    sil!  exec ':silent 1,$:s/\%u2019/"/ge'
+   "    "---(format the results)----------------------#
+   "    sil!  exec ":silent 1,$!HFIX.awk"
+   "    "---(add a footer)----------------------------#
+   "    normal GG
+   "    exec "normal o"
+   "    exec printf("normal i%-86.86s", "end of compiler feedback")
+   " endi
    "---(installation)----------------------------#
-   if    a:std == "m"
-      sil!  exec ":silent 1,$!make -s install_man"
-      normal _
-      exec "normal O"
-      exec printf("normal i%-86.86s", "gcc/make (pass) | manual installation request")
-      normal GG
-      exec "normal o"
-      exec printf("normal i%-86.86s", "end of installation feedback")
-   endif
-   if    a:std == "i"
-      sil!  exec ":silent 1,$!make -s install"
-      normal _
-      exec "normal O"
-      exec printf("normal i%-86.86s", "gcc/make (pass) | executable installation request")
-      normal GG
-      exec "normal o"
-      exec printf("normal i%-86.86s", "end of installation feedback")
-   endif
-   if    a:std == "q" || a:std == "a"
-      sil!  exec ":silent $!make -s install"
-      normal GG
-      exec "normal o"
-      exec printf("normal i%-86.86s", "end of installation feedback")
-   endif
-   norm   _
+   " if    a:std == "m"
+   "    sil!  exec ":silent 1,$!make -s install_man"
+   "    normal _
+   "    exec "normal O"
+   "    exec printf("normal i%-86.86s", "gcc/make (pass) | manual installation request")
+   "    normal GG
+   "    exec "normal o"
+   "    exec printf("normal i%-86.86s", "end of installation feedback")
+   " endif
+   " if    a:std == "i"
+   "    sil!  exec ":silent 1,$!make -s install"
+   "    normal _
+   "    exec "normal O"
+   "    exec printf("normal i%-86.86s", "gcc/make (pass) | executable installation request")
+   "    normal GG
+   "    exec "normal o"
+   "    exec printf("normal i%-86.86s", "end of installation feedback")
+   " endif
+   " if    a:std == "q" || a:std == "a"
+   "    sil!  exec ":silent $!make -s install"
+   "    normal GG
+   "    exec "normal o"
+   "    exec printf("normal i%-86.86s", "end of installation feedback")
+   " endif
+   " norm   _
+ 
+  
    "---(get the function names)------------------#
-   setl   nomodifiable
-   let   x_rc     = s:HFIX__list_head()
-   while x_rc == 0
-      "echo  "tagn=".s:hfix_tagn.", file=".s:hfix_file.", line=".s:hfix_line
-      let   replace  = HTAG_findloc(s:hfix_file, s:hfix_line)
-      call  HBUF_by_name(g:hfix_title)
-      if    (replace != -1)
-         let   x_rc     = s:HFIX__list_update(replace)
-      endi
-      let   x_rc     = s:HFIX__list_next()
-   endwhile
+   " setl   nomodifiable
+   " let   x_rc     = s:HFIX__list_head()
+   " while x_rc == 0
+   "    "echo  "tagn=".s:hfix_tagn.", file=".s:hfix_file.", line=".s:hfix_line
+   "    let   replace  = HTAG_findloc(s:hfix_file, s:hfix_line)
+   "    call  HBUF_by_name(g:hfix_title)
+   " "    if    (replace != -1)
+   "       let   x_rc     = s:HFIX__list_update(replace)
+   "    endi
+   "    let   x_rc     = s:HFIX__list_next()
+   " endwhile
    "echo "done"
    "---(prepare for return)----------------------#
    norm  _j
    setlo nomodifiable
    let   g:hfix_locked = "n"
-   call  s:HFIX_keys()
+   call  HFIX_keys()
    call  HBUF_restore()
    retu
 endf
@@ -571,19 +697,19 @@ function! HFIX_hints(tag)
       echon "  -- FIX not open, can not process..."
    endi
    sil   exec win_num.' wincmd w'
-   sil!  call s:HFIX_unkeys()        " get the key mappings off
+   sil!  call HFIX_unkeys()        " get the key mappings off
    norm  _
    "---(find the tag)-------------------------#
    call  search("^" . a:tag . "  ")
    if    line(".") < 2
       echon "  -- tag not found, can not process..."
-      sil!  call s:HFIX_keys()
+      sil!  call HFIX_keys()
       retu
    endi
    norm  0
    call  s:HFIX__list_entry()
    "---(get the keys back on)-----------------#
-   sil!  call s:HFIX_keys()
+   sil!  call HFIX_keys()
    "---(get back to the original window)------#
    norm  ,a
    let   buf_num = bufnr(s:hfix_file)
