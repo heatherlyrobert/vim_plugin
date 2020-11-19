@@ -90,6 +90,32 @@ $0 ~ /: error: / {
    ##---(done)----------------------------------##
 }
 
+$0 ~ /: undefined reference to `/ {
+   ##---(prepare)-------------------------------##
+   ++g_num_entries;
+   ##---(full text)-----------------------------##
+   g_text [g_num_entries]     = $0;
+   ##---(file info)-----------------------------##
+   g_full [g_num_entries]     = $1;
+   match ($1, "/[A-Za-z0-9_.-]+$");
+   g_base [g_num_entries]     = substr ($1, RSTART + 1, RLENGTH - 1);
+   g_line [g_num_entries]     = $2;
+   ##---(error)---------------------------------##
+   g_type [g_num_entries]     = "error";
+   g_desc [g_num_entries]     = $3;
+   ##---(object)--------------------------------##
+   temp = g_desc [g_num_entries];
+   match(temp, "`[A-Za-z0-9_.: -]+'");
+   if (RSTART > 0)
+      g_obje[g_num_entries]   = substr (temp, RSTART + 1, RLENGTH - 2);
+   else
+      g_obje[g_num_entries]   = "";
+   ##---(update stats)--------------------------##
+   ++g_num_entries;
+   ++g_num_errors;
+   ##---(done)----------------------------------##
+}
+
 $0 ~ /: warning: / {
    ++g_num_warnings;
 }
@@ -98,61 +124,13 @@ $0 ~ /Nothing to be done for '/ {
    g_nothing  = "y"
 }
 
-# $2 ~ /Nothing to be done/ || $2 ~ /no makefile found/ {
-#    ++g_num_messages;
-#    g_messages[g_num_messages]    = $2;
-# }
-
-# $3 ~ /^error$/ || $4 ~ /^error$/ || $3 ~ /^undefined reference/ || $3 ~ /^warning$/  && $4 !~ /unused parameter/  && $4 !~ /unused variable/  && $4 !~ /defined but not used/{
-#    ++g_num_entries;
-#    ##---(full text)-----------------------------##
-#    g_text[g_num_entries]     = $0;
-#    ##---(file info)-----------------------------##
-#    g_full[g_num_entries]     = $1;
-#    match($1, "[A-Za-z0-9_.-]+$");
-#    g_base[g_num_entries]     = substr($1, RSTART, RLENGTH);
-#    g_line[g_num_entries]     = $2;
-#    ##---(error)---------------------------------##
-#    g_type[g_num_entries]     = $3;
-#    g_desc[g_num_entries]     = $4;
-#    if ($6 !~ /^$/) g_desc[g_num_entries] = $4 "::" $6;
-#    ##---(object)--------------------------------##
-#    temp = g_desc[g_num_entries];
-#    match(temp, "'[A-Za-z0-9_.: -]+'");
-#    if (RSTART > 0)
-#       g_obje[g_num_entries]   = substr(temp, RSTART+1, RLENGTH-2);
-#    else
-#       g_obje[g_num_entries]   = "";
-#    ##---(totals)--------------------------------##
-#    if      ($3 == "error")
-#       ++g_num_errors;
-#    else {
-#       if ($4 == "error") {
-#          g_type[g_num_entries]     = $4;
-#          g_desc[g_num_entries]     = $5;
-#          ++g_num_errors;
-#       }
-#       else {
-#          if ($3 ~ /^undefined reference/) {
-#             g_line[g_num_entries]     = 0;
-#             g_type[g_num_entries]     = "error";
-#             g_desc[g_num_entries]     = $3;
-#             ++g_num_errors;
-#          }
-#          else
-#             ++g_num_warnings;
-#       }
-#    }
-# }
-
-
 END {
    if (g_num_errors > 0)
       printf("compiler (FAIL)");
-   else if (g_num_warnings > 0)
-      printf("compiler (warn)");
-   else if (g_num_messages > 0)
-      printf("compiler (warn)");
+   # else if (g_num_warnings > 0)
+   #    printf("compiler (warn)");
+   # else if (g_num_messages > 0)
+   #    printf("compiler (warn)");
    else
       printf("compiler (pass)");
 

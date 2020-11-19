@@ -134,6 +134,7 @@ func! HTAG_keys ()
    nnor           ;;  :call HTAG_hints   ()<cr>
    nmap  <buffer> t   :call HTAG_update  ()<cr>
    nmap  <buffer> h   :call HTAG_hide    ()<cr>
+   nmap  <buffer> d   :call HTAG_detail  ()<cr>
    " nmap  <buffer> s   :call HTAG_stats_full  ("r")<cr>
    " nmap  <buffer> S   :call HTAG_stats_full  ("w")<cr>
    " nmap  <buffer> f   :call HTAG_stats_full  ("f")<cr>
@@ -497,23 +498,10 @@ function! HTAG_parse()
    "---(parse polymnia output)-------------------#
    let  s:HTAG_tagn    = trim (strpart (l:full_line,   0,   2))
    let  s:HTAG_iden    = trim (strpart (l:full_line,   4,  25))
-   let  s:HTAG_cats    = trim (strpart (l:full_line, 114,  45))
-   let  s:HTAG_file    = trim (strpart (l:full_line, 164,  25))
-   let  s:HTAG_line    = trim (strpart (l:full_line, 194,   4))
-   let  s:HTAG_desc    = trim (strpart (l:full_line, 219,  35))
-   "---(line number)-----------------------------#
-"   let  s:HTAG_line    = matchstr   (l:full_line, "  #1#  .*  #2#  ")
-"   let  s:HTAG_line    = substitute (strpart (s:HTAG_line , 7, strlen (s:HTAG_line ) - 14), " ", "", "g")
-   "---(file name)-------------------------------#
-"   let  s:HTAG_file    = matchstr   (l:full_line, "  #2#  .*  #3#  ")
-"   let  s:HTAG_file    = substitute (strpart (s:HTAG_file , 7, strlen (s:HTAG_file ) - 14), " ", "", "g")
-   "---(tag type)--------------------------------#
-"   let  s:HTAG_type    = matchstr   (l:full_line, "  #3#  .*  #4#  ")
-"   let  s:HTAG_type    = substitute (strpart (s:HTAG_type , 7, strlen (s:HTAG_type ) - 14), " ", "", "g")
-   "---(identifier)------------------------------#
-"   let  s:HTAG_iden    = matchstr   (l:full_line, "  #6#  .*  #7#  ")
-"   let  s:HTAG_iden    = substitute (strpart (s:HTAG_iden , 7, strlen (s:HTAG_iden ) - 14), " ", "", "g")
-   "---(complete)--------------------------------#
+   let  s:HTAG_cats    = trim (strpart (l:full_line, 169,  76))
+   let  s:HTAG_line    = trim (strpart (l:full_line, 248,   4))
+   let  s:HTAG_file    = trim (strpart (l:full_line, 255,  25))
+   let  s:HTAG_desc    = trim (strpart (l:full_line, 298,  40))
    return 1
 endfunction
 
