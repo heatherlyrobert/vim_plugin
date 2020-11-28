@@ -112,18 +112,26 @@ func! HTAG_syntax ()
    synt  clear
    synt  match htag_file           '^[A-Za-z0-9_.-]\+[ ]\+FILE'
    synt  match htag_major          '^[a-z].*[ ]([0-9]\+)$'
-   synt  match htag_major_new      '^function[ ]([0-9]\+)'
+   synt  match htag_major_new      '^function[ ]([ 0-9]\+)'
+   synt  match htag_footprint      '^footprint'
    synt  match htag_context        '^  [a-z][a-z/][a-z] [=].*'
    synt  match htag_detail         '^[a-z-][a-z-]  [a-zA-Z][a-zA-Z0-9_].*'
    synt  match htag_tag            '^[a-z-][a-zA-Z-0#]  '   containedin=rsh_tag_detail
    synt  match htag_separator      'o___[A-Z_].*___'        containedin=rsh_tab_detail
+   synt  match htag_text           '^text '                 
+   synt  match htag_data           '^data '                 
+   synt  match htag_bss            '^bss  '                 
    hi    htag_file      cterm=reverse,bold   ctermbg=none   ctermfg=5
    hi    htag_major     cterm=bold,underline ctermbg=none   ctermfg=5
    hi    htag_major_new cterm=bold,underline ctermbg=none   ctermfg=5
+   hi    htag_footprint cterm=bold,underline ctermbg=none   ctermfg=5
    hi    htag_context   cterm=none           ctermbg=none   ctermfg=3
    hi    htag_detail    cterm=none           ctermbg=none   ctermfg=0
    hi    htag_tag       cterm=bold           ctermbg=none   ctermfg=4
    hi    htag_separator cterm=none           ctermbg=none   ctermfg=7
+   hi    htag_text      cterm=bold           ctermbg=none   ctermfg=4
+   hi    htag_data      cterm=bold           ctermbg=none   ctermfg=4
+   hi    htag_bss       cterm=bold           ctermbg=none   ctermfg=4
    retu  0
 endf
 
