@@ -1,2 +1,2 @@
-#define    VER_NUM "1.7d"
-#define    VER_TXT "updated to help with polymnia"
+#define    VER_NUM "2.0a"
+#define    VER_TXT "advanced tags to match polymnia"

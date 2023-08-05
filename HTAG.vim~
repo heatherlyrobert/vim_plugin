@@ -115,11 +115,14 @@ func! HTAG_syntax ()
    synt  match htag_major_new      '^function[ ]([ 0-9]\+)'
    synt  match htag_footprint      '^footprint'
    synt  match htag_context        '^  [a-z][a-z/][a-z] [=].*'
-   synt  match htag_detail         '^[a-z-][a-z-]  [a-zA-Z][a-zA-Z0-9_].*'
-   synt  match htag_tag            '^[a-z-][a-zA-Z-0#]  '   containedin=rsh_tag_detail
-   synt  match htag_separator      'o___[A-Z_].*___'        containedin=rsh_tab_detail
-   synt  match htag_text           '^text '                 
-   synt  match htag_data           '^data '                 
+   synt  match htag_detail         '^[a-z-][a-z-] [ ·á][a-zA-Z][a-zA-Z0-9_].*'
+   synt  match htag_tag            '^[a-z-][a-zA-Z-0#]  '                         containedin=rsh_tag_detail
+   synt  match htag_single         '^[a-z-][a-zA-Z-0#] á[a-zA-Z][a-zA-Z0-9_].*'   containedin=rsh_tag_detail
+   synt  match htag_sep            '^[a-z-][a-zA-Z-0#] ·o___[A-Z_].*___o'         containedin=rsh_tag_detail
+   synt  match htag_unitprep       '^[a-z-][a-zA-Z-0#]  ___prep___'               containedin=rsh_tab_detail
+   synt  match htag_unitshare      '^[a-z-][a-zA-Z-0#]  ([a-zA-Z]_shared)'        containedin=rsh_tab_detail
+   synt  match htag_text           '^txt  '                 
+   synt  match htag_data           '^dat  '                 
    synt  match htag_bss            '^bss  '                 
    hi    htag_file      cterm=reverse,bold   ctermbg=none   ctermfg=5
    hi    htag_major     cterm=bold,underline ctermbg=none   ctermfg=5
@@ -128,7 +131,10 @@ func! HTAG_syntax ()
    hi    htag_context   cterm=none           ctermbg=none   ctermfg=3
    hi    htag_detail    cterm=none           ctermbg=none   ctermfg=0
    hi    htag_tag       cterm=bold           ctermbg=none   ctermfg=4
-   hi    htag_separator cterm=none           ctermbg=none   ctermfg=7
+   hi    htag_single    cterm=bold           ctermbg=none   ctermfg=5
+   hi    htag_sep       cterm=bold           ctermbg=none   ctermfg=7
+   hi    htag_unitprep  cterm=bold           ctermbg=none   ctermfg=7
+   hi    htag_unitshare cterm=bold           ctermbg=none   ctermfg=7
    hi    htag_text      cterm=bold           ctermbg=none   ctermfg=4
    hi    htag_data      cterm=bold           ctermbg=none   ctermfg=4
    hi    htag_bss       cterm=bold           ctermbg=none   ctermfg=4
@@ -139,6 +145,8 @@ endf
 ""=[[ establish buffer specific key mapping ]]============[ leaf   [ 110n0x ]=##
 func! HTAG_keys ()
    nmap           ,t  :call HTAG_show    (expand("<cword>"))<cr>
+   nmap           ;c  :call HTAG_header  ("S",expand("<cWORD>"))<cr>
+   nmap           ;C  :call HTAG_header  ("L",expand("<cWORD>"))<cr>
    nnor           ;;  :call HTAG_hints   ()<cr>
    nmap  <buffer> t   :call HTAG_update  ()<cr>
    nmap  <buffer> h   :call HTAG_hide    ()<cr>
@@ -313,7 +321,7 @@ function! HTAG_hints()       " PURPOSE : move to a specific hint/tag
    endif
    silent exec   ":norm  _"
    "---(find the tag)-------------------------#
-   call   search("^" . l:tag_id . "  ","cW")
+   call   search("^" . l:tag_id . " ","cW")
    if line(".") <= 1
       echon "  TAG NOT FOUND, exiting"
       call HBUF_restore()
@@ -348,6 +356,66 @@ function! HTAG_hints()       " PURPOSE : move to a specific hint/tag
       silent exec "normal {j"
    endif
    silent exec "normal zt"
+   "---(complete)-----------------------------#
+   return
+endfunction
+
+
+
+function! HTAG_header (style,func)       " PURPOSE : update a function header
+   "---(save working win/buf/loc)----------------#
+   if (HBUF_save("HTAG_header ()      :: ") < 1)
+      return
+   endif
+   "---(find the tags window)--------------------#
+   if (HBUF_by_name(g:HTAG_title) < 1)
+      return
+   endif
+   "---(save working win/buf/loc)----------------#
+   " echon "HTAG_header ()      :: (".a:style.") ¶".a:func."¶"
+   "---(find the tag)-------------------------#
+   norm  _
+   call   search("^..  ".a:func."  ","cW")
+   if line(".") <= 1
+      echon "  TAG NOT FOUND, exiting"
+      return
+   endif
+   let  l:full_line   = getline(".")
+   call HTAG_parse()
+   call HBUF_restore()
+   silent exec "normal k0"
+   silent exec "normal O/*"
+   if    (a:style == "S")
+      silent exec "normal ocomplexity    ".trim (strpart (s:HTAG_cats,   0,  32))
+      silent exec "normal ointegration   ".trim (strpart (s:HTAG_cats,  33,  29))
+      silent exec "normal owatch-points  ".trim (strpart (s:HTAG_cats,  63,  24))
+      silent exec "normal o"
+      silent exec "normal o·scp·--params--·lin·var·--code-···call-by·-call-to-·i/o·graf···debug·macros·mask·unit·"
+      silent exec "normal o".s:HTAG_cats
+   else
+      silent exec "normal oo                               p                        w      c  F G X r  c                            n   w     D                                L          "
+      silent exec "normal on          p p             p    s    %           i   c r ´  m   a  c c c e  a D R  F G     v O m    o s  c o i y   a D D D    m    g     v          s        s "
+      silent exec "normal oe   s r p  a a      p      m p  t  t d %  L F G  n   h e e  e   l  a a a c  l f f  f f     i f y  i u y  u p n g   c s m m D  a    l     i o  V M F t  u s s t "
+      silent exec "normal ol   c t r  u r    p b p  p u f  r  o e c  v v v  d l o t r  m   l  l l l u  l u u  u u c y k u s  n t s  r e d r   t t a a w  c  f o c y k t  m m m a  n c t r "
+      silent exec "normal oi   o y o  d a  p o o c  n l u  u  t b o  a a a  e o i u r  o   ´  l l l r  ´ n n  n n s l e n t  p p t  s n o a   i y c t a  r  i b s l e h  a a a t  i r e i "
+      silent exec "normal on   p p t  i m  i u t h  u t n  c  a u d  r r r  n o c r o  r   b  e e e s  t c c  c c t i y c r  u u e  e g w p   v l r c r  o  l a t i y e  s s s i  t p p n "
+      silent exec "normal oe   e e o  t s  n t h g  m i c  t  l g e  s s s  t p e n r  y   y  r r r e  o s s  s s d b s s y  t t m  s l s h   e e o h n  s  e l d b s r  k k k c  s s s g "
+      silent exec "normal oá  å-----------------------complexity------------------------æ å-------------------integration------------------æ å----------------watch-points---------------æ"
+      silent exec "normal o".s:HTAG_long
+   endif
+   silent exec "normal o"
+   silent exec "normal o".printf ("å%-10.10sæ  å%4dæ  å%sæ", s:HTAG_anat, s:HTAG_line, s:HTAG_desc)
+   silent exec "normal o/"
+   if    (a:style == "L")
+      let  l:body = printf("%s ---------------------------------------------------------------------", s:HTAG_desc)
+      let  l:anat = printf("%s··········", s:HTAG_anat)
+      if (strlen (s:HTAG_rtype) < 13 && strlen (s:HTAG_rtype) > 0)
+         silent exec "normal o".printf("%-12.12s /*-> %-45.45s[ %-10.10s ]-*/ /*-", s:HTAG_rtype, l:body, l:anat).s:HTAG_cats."-*/"
+      else
+         silent exec "normal o".printf("             /*-> %-45.45s[ %-10.10s ]-*/ /*-", l:body, s:HTAG_anat).s:HTAG_cats."-*/"
+      endif
+      silent exec "normal 0"
+   endif
    "---(complete)-----------------------------#
    return
 endfunction
@@ -494,10 +562,11 @@ function! HTAG_parse()
    "---(initialize)------------------------------#
    let  s:HTAG_tagn    = ""
    let  s:HTAG_iden    = ""
+   let  s:HTAG_long    = ""
    let  s:HTAG_cats    = ""
    let  s:HTAG_file    = ""
    let  s:HTAG_line    = 0
-   let  s:HTAG_desc    = 0
+   let  s:HTAG_desc    = ""
    "---(check for null)--------------------------#
    let  l:full_line = getline('.')
    if (l:full_line == "")
@@ -506,10 +575,13 @@ function! HTAG_parse()
    "---(parse polymnia output)-------------------#
    let  s:HTAG_tagn    = trim (strpart (l:full_line,   0,   2))
    let  s:HTAG_iden    = trim (strpart (l:full_line,   4,  25))
-   let  s:HTAG_cats    = trim (strpart (l:full_line, 169,  76))
-   let  s:HTAG_line    = trim (strpart (l:full_line, 248,   4))
-   let  s:HTAG_file    = trim (strpart (l:full_line, 255,  25))
-   let  s:HTAG_desc    = trim (strpart (l:full_line, 298,  40))
+   let  s:HTAG_long    = trim (strpart (l:full_line,  32, 158))
+   let  s:HTAG_cats    = trim (strpart (l:full_line, 194,  92))
+   let  s:HTAG_line    = trim (strpart (l:full_line, 288,   4))
+   let  s:HTAG_file    = trim (strpart (l:full_line, 295,  25))
+   let  s:HTAG_desc    = trim (strpart (l:full_line, 338,  40))
+   let  s:HTAG_anat    = trim (strpart (l:full_line, 381,  10))
+   let  s:HTAG_rtype   = trim (strpart (l:full_line, 394,  20))
    return 1
 endfunction
 
