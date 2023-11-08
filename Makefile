@@ -10,7 +10,8 @@ install            : HFIX.awk HTAG.awk
 	_inst --bin HCSC
 	_inst --bin HCOM
 
-clean              :
+allclean           :
+	rm *~
 
 
 remove             :

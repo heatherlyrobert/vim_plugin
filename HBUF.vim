@@ -108,11 +108,22 @@ endf
 
 
 func! s:HBUF_init()
+   :silent !rm -f .HALL_buffer.sw*
+   :silent !rm -f .HBUF_buffer.sw*
+   :silent !rm -f .HCSC_buffer.sw*
+   :silent !rm -f .HFIX_buffer.sw*
+   :silent !rm -f .HGDB_buffer.sw*
+   "" echoc "HBUF_init ()  begin"
    sil!  exec 'topleft split ' . g:hbuf_title
+   "" echoc "HBUF_init ()  split done"
    call  HALL_start()
+   "" echoc "HALL_start ()  done"
    call  s:HBUF_syntax()
+   "" echoc "HBUF_syntax ()  done"
    call  s:HBUF_keys()
+   "" echoc "HBUF_keys ()  done"
    hide
+   "" echoc "HBUF_init ()  end"
    retu
 endf
 
@@ -158,8 +169,8 @@ endf
 func! s:HBUF_unkeys()
    setlo modifiable
    nunm  <buffer>   -
-   nunm  <buffer>   +
-   nunm  <buffer>   h
+      nunm  <buffer>   +
+      nunm  <buffer>   h
    nunm  <buffer>   b
    setlo nomodifiable
    retu
@@ -550,7 +561,6 @@ func! HBUF_save (prefix)
    retu  g:hbuf_pbuf
 endf
 
-
 function! HBUF_saved()
    echo "buf=".g:hbuf_pbuf.", name=".g:hbuf_pname.", line=".g:hbuf_pline.", col=".g:hbuf_pcol
    return
@@ -610,6 +620,13 @@ func! HBUF_next(buf_num)
 endf
 
 
+"func! HBUF_metis ()
+"   let  l:buf = bufname ()
+"   let  l:len = strlen  (l:buf)
+"   let  l:part= strpart (l:buf, l:len - 5)
+"   if   (l:part == ".unit")
+"   endif
+"endf
 
 call s:HBUF_init()
 

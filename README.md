@@ -1,2 +1,2 @@
-#define    VER_NUM "2.0a"
-#define    VER_TXT "advanced tags to match polymnia"
+#define    VER_NUM "2.0b"
+#define    VER_TXT "updated to clear only files when initiating"
